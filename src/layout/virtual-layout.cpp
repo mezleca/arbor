@@ -131,6 +131,10 @@ void VirtualLayout::on_measure() {
     }
 }
 
+ImVec2 VirtualLayout::measure_content(ImVec2) const {
+    return {0.0F, content_height()};
+}
+
 bool VirtualLayout::paint() {
     const float content_width = std::max(0.0F, content_size(layout().size()).x - ImGui::GetStyle().ScrollbarSize);
     ImGui::SetNextWindowContentSize({content_width, content_height()});

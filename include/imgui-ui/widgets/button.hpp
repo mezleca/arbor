@@ -31,6 +31,7 @@ namespace ui {
         void apply_theme_defaults(const Theme& theme) override;
         void click_event(UiEvent&) override;
         void on_measure() override;
+        ImVec2 measure_content(ImVec2 available) const override;
 
     private:
         void paint_content(const PaintContext& context) override;

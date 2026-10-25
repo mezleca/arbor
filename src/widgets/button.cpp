@@ -56,11 +56,15 @@ void ButtonWidget::on_measure() {
     m_text.set_font(font(), font_size());
     m_text.set_line_height(computed_style().line_height());
 
-    ImVec2 size = m_text.text_size();
-    const ImVec2 children_size = measure_children();
-    size = {std::max(size.x, children_size.x), std::max(size.y, children_size.y)};
+    Container::on_measure();
+}
 
-    set_measured_content_size(size);
+ImVec2 ButtonWidget::measure_content(ImVec2 available) const {
+    ImVec2 size = m_text.text_size();
+    const ImVec2 children_size = measure_children(available);
+    size = {std::max(size.x, children_size.x), std::max(size.y, children_size.y)};
+    size.y = std::max(size.y, font_size() * computed_style().line_height());
+    return size;
 }
 
 void ButtonWidget::paint_content(const PaintContext& context) {

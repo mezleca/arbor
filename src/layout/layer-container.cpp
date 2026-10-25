@@ -64,12 +64,12 @@ void LayerContainer::on_layout() {
     if (m_mode == LayerMode::Inline) {
         const Rect parent_content = layout().parent_content_rect();
         if (parent_content.valid()) {
-            assign_size(layout().resolve_size(parent_content.size()));
+            assign_size(resolve_size(parent_content.size()));
             return;
         }
     }
 
-    assign_size(layout().resolve_size(ImGui::GetMainViewport()->WorkSize));
+    assign_size(resolve_size(ImGui::GetMainViewport()->WorkSize));
 }
 
 bool LayerContainer::paint() {

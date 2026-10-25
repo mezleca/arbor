@@ -9,14 +9,16 @@ ImageWidget::ImageWidget(Texture* texture) : Widget({}, "Image", InputMode::None
     set_size({fit(), fit()});
 }
 
-void ImageWidget::on_measure() {
-    const ImVec2 children_size = measure_children();
+ImVec2 ImageWidget::measure_content(ImVec2 available) const {
+    const ImVec2 children_size = measure_children(available);
     if (m_texture != nullptr) {
         const ImVec2 texture_size = m_texture->size();
-        set_measured_content_size({std::max(texture_size.x, children_size.x), std::max(texture_size.y, children_size.y)});
-    } else {
-        set_measured_size(outer_size(children_size));
+        return {
+            std::max(texture_size.x, children_size.x),
+            std::max({texture_size.y, children_size.y, font_size() * computed_style().line_height()})
+        };
     }
+    return children_size;
 }
 
 void ImageWidget::paint_content(const PaintContext& context) {

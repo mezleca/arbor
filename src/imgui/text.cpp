@@ -85,7 +85,7 @@ void Painter::text_ellipsis(ImVec2 position, const Color& source, const TextValu
     const char* const value_end = string.c_str() + string.size();
     const char* line = string.c_str();
 
-    for (float y = position.y; y + font_size <= clip_rect.w; y += line_height) {
+    for (float y = position.y; y < clip_rect.w; y += line_height) {
         const char* const paragraph_end = std::find(line, value_end, '\n');
         const char* line_end = paragraph_end;
         if (wrap_width > 0.0F && line < paragraph_end) {
@@ -102,7 +102,7 @@ void Painter::text_ellipsis(ImVec2 position, const Color& source, const TextValu
             draw(position.x + visible_width, y, ellipsis, nullptr);
         }
 
-        if (line_end == value_end) {
+        if (line_end == value_end || hidden_lines) {
             break;
         }
 

@@ -25,6 +25,12 @@ namespace ui {
         Vertical,
     };
 
+    enum class StackWrap : uint8_t {
+        NoWrap,
+        Wrap,
+        WrapReverse,
+    };
+
     enum class ResizeAxes : uint8_t {
         None = 0,
         X = 1U << 0U,
@@ -65,6 +71,7 @@ namespace ui {
         float intrinsic(float measured, float insets = 0.0F, BoxSizing box_sizing = BoxSizing::BorderBox) const;
 
         /// resolves the rule and limits into an outer extent using available parent space in pixels.
+        /// an unbounded axis uses intrinsic sizing, without unresolved percentage rules or limits.
         float resolve(float measured, float available, float insets = 0.0F, BoxSizing box_sizing = BoxSizing::BorderBox) const;
         float constrain(float size, float available, float insets = 0.0F, BoxSizing box_sizing = BoxSizing::BorderBox) const;
         constexpr bool operator==(const LayoutAxis&) const = default;
@@ -227,12 +234,14 @@ namespace ui {
         /// measures content with pixel limits applied. percentage rules and limits wait for parent allocation,
         /// avoiding a dependency on a fit-sized parent's own unresolved size.
         ImVec2 intrinsic_size() const;
+        ImVec2 intrinsic_size(ImVec2 measured) const;
 
         ImVec2 resolved_size() const {
             return resolve_size(m_available_size);
         }
 
         ImVec2 resolve_size(ImVec2 available_size) const;
+        ImVec2 resolve_size(ImVec2 available_size, ImVec2 measured) const;
 
         /// clamps an outer allocation against px/percent limits resolved from available parent space.
         /// padding and borders remain the minimum possible outer allocation. minimum wins over a smaller maximum.

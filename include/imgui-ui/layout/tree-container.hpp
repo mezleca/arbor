@@ -10,7 +10,7 @@ namespace ui {
         explicit TreeContainer(std::string label, std::string id = {});
 
     private:
-        void on_measure() override;
+        ImVec2 measure_content(ImVec2 available) const override;
         bool paint() override;
         void on_draw_end() override;
         ImVec2 child_window_size() const override;

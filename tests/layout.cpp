@@ -68,6 +68,206 @@ static void draw_open_tree(Node& node, const char* name) {
     });
 }
 
+TEST_CASE("wrap measures and allocates each line in either direction", "[layout][wrap]") {
+    ui_test::ImGuiContext context({500, 400});
+    const auto direction = GENERATE(StackDirection::Horizontal, StackDirection::Vertical);
+    const int main = direction == StackDirection::Horizontal ? 0 : 1;
+    const int cross = 1 - main;
+    const auto size = [main](LayoutAxis along, LayoutAxis across) {
+        return main == 0 ? LayoutSize{along, across} : LayoutSize{across, along};
+    };
+    const auto extent = [main](float along, float across) {
+        return main == 0 ? ImVec2{along, across} : ImVec2{across, along};
+    };
+    Container row("wrapping-row", direction);
+    row.set_size(size(px(210), fit()));
+    row.set_spacing(10);
+    auto& first = row.add<MeasuredLayoutNode>(extent(100, 20));
+    auto& second = row.add<MeasuredLayoutNode>(extent(100, 40));
+    auto& third = row.add<MeasuredLayoutNode>(extent(100, 30));
+    ui_test::draw_node(row, "wrap-lines");
+    CHECK(third.layout().local_rect().min[main] == Catch::Approx(220));
+    CHECK(row.layout().size()[cross] == Catch::Approx(40));
+    row.set_wrap(StackWrap::Wrap);
+    ui_test::draw_node(row, "wrap-lines");
+    CHECK(first.layout().local_rect().min[cross] == Catch::Approx(second.layout().local_rect().min[cross]));
+    CHECK(third.layout().local_rect().min[main] == Catch::Approx(0));
+    CHECK(third.layout().local_rect().min[cross] == Catch::Approx(50));
+    CHECK(row.layout().size()[cross] == Catch::Approx(80));
+
+    SECTION("grow limits are shared within each line") {
+        first.set_size(size({grow(1), px(80), px(90)}, px(20)));
+        second.set_size(size({grow(2), px(80), px(300)}, px(40)));
+        third.set_size(size({grow(), px(80), px(300)}, px(30)));
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(first.layout().size()[main] == Catch::Approx(90));
+        CHECK(second.layout().size()[main] == Catch::Approx(110));
+        CHECK(third.layout().size()[main] == Catch::Approx(210));
+        CHECK(third.layout().local_rect().min[cross] == Catch::Approx(50));
+    }
+    SECTION("reverse swaps cross edges without reversing items") {
+        row.set_wrap(StackWrap::WrapReverse);
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(first.layout().local_rect().min[cross] == Catch::Approx(60));
+        CHECK(second.layout().local_rect().min[main] == Catch::Approx(110));
+        CHECK(third.layout().local_rect().min[cross] == Catch::Approx(0));
+    }
+    SECTION("lines stretch and align independently") {
+        row.set_size(size(px(200), px(140)));
+        row.set_spacing(0);
+        row.set_content_alignment(Anchor::Center);
+        first.set_size(size(percent(50), grow()));
+        third.set_intrinsic_size(extent(100, 20));
+        third.set_size(size(percent(50), grow()));
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(first.layout().size()[cross] == Catch::Approx(80));
+        CHECK(second.layout().local_rect().min[cross] == Catch::Approx(20));
+        CHECK(third.layout().size()[cross] == Catch::Approx(60));
+        CHECK(third.layout().local_rect().min[main] == Catch::Approx(50));
+        CHECK(third.layout().local_rect().min[cross] == Catch::Approx(80));
+    }
+    SECTION("zero sized items stay on a full line and empty rows reserve no gap") {
+        row.set_size(size(px(100), fit()));
+        row.set_spacing(0);
+        second.set_size(size(px(0), px(5)));
+        third.set_size(size(px(1), px(10)));
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(second.layout().local_rect().min[cross] == Catch::Approx(0));
+        CHECK(third.layout().local_rect().min[cross] == Catch::Approx(20));
+        CHECK(row.layout().size()[cross] == Catch::Approx(30));
+        row.clear();
+        row.update(0);
+        row.set_spacing(20);
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(row.layout().size()[cross] == Catch::Approx(0));
+    }
+    SECTION("fit main limits and fractional insets") {
+        row.set_size(size({fit(), px(0), px(160)}, fit()));
+        row.set_spacing(0);
+        row.configure_all_styles([main](Style& style) {
+            style.padding(main == 0 ? BoxInsets{0.1F, 0.2F} : BoxInsets{0.2F, 0.1F});
+        });
+        first.set_size(size(px(80), px(20)));
+        second.set_size(size(px(80), px(30)));
+        third.set_visible(false);
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(row.layout().size()[main] == Catch::Approx(160));
+        CHECK(row.layout().size()[cross] == Catch::Approx(50.4F));
+        row.set_size({fit(), fit()});
+        ui_test::draw_node(row, "wrap-lines");
+        CHECK(row.layout().size()[main] == Catch::Approx(160.2F));
+        CHECK(row.layout().size()[cross] == Catch::Approx(30.4F));
+    }
+}
+
+TEST_CASE("wrap respects box insets margins visibility and oversized items", "[layout][wrap]") {
+    ui_test::ImGuiContext context({500, 400});
+    Container row("wrap-boxes", StackDirection::Horizontal);
+    row.set_wrap(StackWrap::Wrap);
+    auto& first = row.add<Container>("first");
+    first.set_size({px(90), px(20)});
+    first.configure_all_styles([](Style& style) { style.margin({5, 3, 5, 7}); });
+    SECTION("outer sizes include box insets and skip inactive children") {
+        row.set_size({px(230), fit()});
+        row.configure_all_styles([](Style& style) { style.padding({10, 5}).border(BorderEdge{2, BorderType::Solid}); });
+        auto& second = row.add<LayoutProbeNode>(ImVec2{100, 40});
+        auto& oversized = row.add<LayoutProbeNode>(ImVec2{250, 25});
+        row.add<LayoutProbeNode>(ImVec2{300, 300}).set_visible(false);
+        row.add<LayoutProbeNode>(ImVec2{300, 300}).set_anchor(Anchor::TopRight);
+        auto& removed = row.add<LayoutProbeNode>(ImVec2{300, 300});
+        row.remove(removed);
+        ui_test::draw_node(row, "wrap-boxes");
+        CHECK(first.layout().local_rect().min.x == Catch::Approx(17));
+        CHECK(second.layout().local_rect().min.x == Catch::Approx(112));
+        CHECK(oversized.layout().local_rect().min.x == Catch::Approx(12));
+        CHECK(oversized.layout().local_rect().min.y == Catch::Approx(47));
+        CHECK(oversized.layout().size().x == Catch::Approx(250));
+        CHECK(row.layout().size().y == Catch::Approx(79));
+    }
+    SECTION("reverse keeps physical margins") {
+        row.set_size({px(100), px(100)});
+        row.set_wrap(StackWrap::WrapReverse);
+        ui_test::draw_node(row, "wrap-boxes");
+        CHECK(first.layout().local_rect().min.y == Catch::Approx(73));
+    }
+}
+
+TEST_CASE("nested wrap measurements use the current allocated width", "[layout][wrap][regression]") {
+    ui_test::ImGuiContext context({600, 400});
+    Container column("outer-column");
+    auto& row = column.add<Container>("inner-row", StackDirection::Horizontal);
+    row.set_size({grow(), fit()});
+    row.set_wrap(StackWrap::Wrap);
+    row.set_spacing(10);
+    for (int index = 0; index < 3; ++index) row.add<LayoutProbeNode>(ImVec2{100, 30});
+    auto& footer = column.add<LayoutProbeNode>(ImVec2{100, 20});
+    SECTION("resize positions siblings on the first frame") {
+        for (const auto& [width, height] : {std::pair{220.0F, 70.0F}, std::pair{320.0F, 30.0F}, std::pair{90.0F, 110.0F}}) {
+            column.set_size({px(width), fit()});
+            ui_test::draw_node(column, "nested-wrap");
+            CHECK(row.layout().size().y == Catch::Approx(height));
+            CHECK(footer.layout().local_rect().min.y == Catch::Approx(height));
+            CHECK(column.layout().size().y == Catch::Approx(height + 20));
+        }
+    }
+    SECTION("grow sharing resolves fit and grow cross extents") {
+        column.set_direction(StackDirection::Horizontal);
+        column.set_size({px(200), fit()});
+        row.set_spacing(0);
+        row.set_size({grow(), GENERATE(fit(), grow())});
+        footer.set_size({grow(), px(30)});
+        ui_test::draw_node(column, "nested-wrap");
+        CHECK(row.layout().size().x == Catch::Approx(100));
+        CHECK(row.layout().size().y == Catch::Approx(90));
+        CHECK(column.layout().size().y == Catch::Approx(90));
+    }
+    SECTION("bounded fit width constrains growing wrapped children") {
+        column.set_size({{fit(), px(0), px(100)}, fit()});
+        ui_test::draw_node(column, "nested-wrap");
+        CHECK(row.layout().size().x == Catch::Approx(100));
+        CHECK(row.layout().size().y == Catch::Approx(110));
+        CHECK(footer.layout().local_rect().min.y == Catch::Approx(110));
+        CHECK(column.layout().size().y == Catch::Approx(130));
+    }
+}
+
+TEST_CASE("wrapped rows contribute all lines to the scroll extent", "[layout][wrap][scroll]") {
+    ui_test::ImGuiContext context({500, 400});
+    Container viewport("wrap-scroll");
+    viewport.set_size({px(230), px(60)});
+    viewport.set_scrollable(true);
+    auto& row = viewport.add<Container>("scroll-row", StackDirection::Horizontal);
+    row.set_size({grow(), fit()});
+    row.set_wrap(StackWrap::Wrap);
+    for (int index = 0; index < 10; ++index) row.add<LayoutProbeNode>(ImVec2{100, 20});
+    for (int frame = 0; frame < 3; ++frame) ui_test::draw_node(viewport, "wrap-scroll-window");
+    CHECK(row.layout().size().y == Catch::Approx(100));
+    CHECK(viewport.scroll().max().y >= 40);
+    viewport.scroll().seek_to({0, 40}, ScrollBehavior::Instant);
+    ui_test::draw_node(viewport, "wrap-scroll-window");
+    ui_test::draw_node(viewport, "wrap-scroll-window");
+    CHECK(viewport.scroll().position().y == Catch::Approx(40));
+}
+
+TEST_CASE("tree measurements reserve the wrapped body below the header", "[layout][wrap][TreeContainer]") {
+    ui_test::ImGuiContext context({500, 400});
+    TreeContainer tree("wrapping tree");
+    tree.set_size({px(230), fit()});
+    auto& row = tree.add<Container>("tree-row", StackDirection::Horizontal);
+    row.set_size({grow(), fit()});
+    row.set_wrap(StackWrap::Wrap);
+    for (int index = 0; index < 3; ++index) row.add<LayoutProbeNode>(ImVec2{100, 20});
+    draw_open_tree(tree, "wrap-tree-window");
+    draw_open_tree(tree, "wrap-tree-window");
+    CHECK(row.layout().size().y == Catch::Approx(40));
+    const float initial_height = tree.layout().size().y;
+
+    tree.set_size({px(120), fit()});
+    draw_open_tree(tree, "wrap-tree-window");
+    CHECK(row.layout().size().y == Catch::Approx(60));
+    CHECK(tree.layout().size().y == Catch::Approx(initial_height + 20));
+}
+
 TEST_CASE("button children stay inside their card when the parent moves and resizes", "[layout][Widget][regression]") {
     ui_test::ImGuiContext context({800.0F, 600.0F});
     Container root("card-root");

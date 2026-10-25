@@ -1,6 +1,7 @@
 #include <imgui-ui/layout/geometry.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 using namespace ui;
 
@@ -37,6 +38,8 @@ float LayoutAxis::intrinsic(float measured, float insets, BoxSizing box_sizing) 
 }
 
 float LayoutAxis::resolve(float measured, float available, float insets, BoxSizing box_sizing) const {
+    if (!std::isfinite(available)) return intrinsic(measured, insets, box_sizing);
+
     float size = std::max(0.0F, available);
     if (mode == LayoutSizeMode::Fixed)
         size = value;
@@ -66,16 +69,24 @@ ImVec2 ui::clamp_position(Rect bounds, ImVec2 size, ImVec2 position) {
 }
 
 ImVec2 NodeLayout::intrinsic_size() const {
+    return intrinsic_size(m_measured_size);
+}
+
+ImVec2 NodeLayout::intrinsic_size(ImVec2 measured) const {
     return {
-        m_config.size.width.intrinsic(m_measured_size.x, m_box_insets.horizontal(), m_box_sizing),
-        m_config.size.height.intrinsic(m_measured_size.y, m_box_insets.vertical(), m_box_sizing),
+        m_config.size.width.intrinsic(measured.x, m_box_insets.horizontal(), m_box_sizing),
+        m_config.size.height.intrinsic(measured.y, m_box_insets.vertical(), m_box_sizing),
     };
 }
 
 ImVec2 NodeLayout::resolve_size(ImVec2 available_size) const {
+    return resolve_size(available_size, m_measured_size);
+}
+
+ImVec2 NodeLayout::resolve_size(ImVec2 available_size, ImVec2 measured) const {
     return {
-        m_config.size.width.resolve(m_measured_size.x, available_size.x, m_box_insets.horizontal(), m_box_sizing),
-        m_config.size.height.resolve(m_measured_size.y, available_size.y, m_box_insets.vertical(), m_box_sizing),
+        m_config.size.width.resolve(measured.x, available_size.x, m_box_insets.horizontal(), m_box_sizing),
+        m_config.size.height.resolve(measured.y, available_size.y, m_box_insets.vertical(), m_box_sizing),
     };
 }
 

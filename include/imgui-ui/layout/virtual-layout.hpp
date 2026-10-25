@@ -41,6 +41,7 @@ namespace ui {
 
     protected:
         void on_measure() override;
+        ImVec2 measure_content(ImVec2 available) const override;
         void draw_children() override;
         bool paint() override;
 

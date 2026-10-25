@@ -351,6 +351,21 @@ void Node::assign_size(ImVec2 size) {
     m_layout.assign_size(size);
 }
 
+ImVec2 Node::resolve_size(ImVec2 available) const {
+    const LayoutSize& spec = m_layout.size_spec();
+    const ImVec2 allocation = m_layout.resolve_size(available);
+    if (spec.width.mode != LayoutSizeMode::Fit && spec.height.mode != LayoutSizeMode::Fit) {
+        return allocation;
+    }
+
+    const ImVec2 measured = measure_size(allocation);
+    return m_layout.resolve_size(available, measured);
+}
+
+ImVec2 Node::measure_size(ImVec2) const {
+    return m_layout.measured_size();
+}
+
 void Node::set_measured_size(ImVec2 size) {
     m_layout.set_measured_size(size);
 }
@@ -637,7 +652,7 @@ bool Node::paint() {
 
 void Node::on_layout() {
     if (!has_parent_size()) {
-        assign_size(m_layout.resolved_size());
+        assign_size(resolve_size(m_layout.available_size()));
     }
 }
 

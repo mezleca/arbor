@@ -3,6 +3,7 @@
 #include <imgui-ui/constants.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <imgui_internal.h>
 #include <utility>
 
@@ -73,6 +74,14 @@ Container& Container::set_content_alignment(ImVec2 alignment) {
     return *this;
 }
 
+Container& Container::set_wrap(StackWrap wrap) {
+    if (m_wrap == wrap) return *this;
+
+    m_wrap = wrap;
+    invalidate_measure();
+    return *this;
+}
+
 Container& Container::set_spacing(float spacing) {
     const float resolved = std::max(0.0F, spacing);
     if (m_spacing == resolved) {
@@ -89,80 +98,110 @@ void Container::apply_theme_defaults(const Theme& theme) {
 }
 
 void Container::on_measure() {
-    set_measured_size(outer_size(measure_children()));
+    const float unbounded = std::numeric_limits<float>::infinity();
+    set_measured_size(outer_size(measure_content({unbounded, unbounded})));
 }
 
-ImVec2 Container::measure_children() const {
-    const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
-    const int cross = 1 - main;
-    ImVec2 content_size{};
-    size_t flow_count = 0;
+ImVec2 Container::measure_content(ImVec2 available) const {
+    return measure_children(available);
+}
 
-    // sum preferred extents and margins along the flow axis. the cross axis takes the largest child extent.
-    for (const auto& child : children()) {
-        if (!is_flow_child(*child)) {
-            continue;
-        }
+ImVec2 Container::measure_size(ImVec2 allocation) const {
+    if (children().empty()) return Node::measure_size(allocation);
 
-        const ImVec2 child_size = child->layout().intrinsic_size();
-        const BoxInsets margin = child->layout_margin();
-        const ImVec2 outer_size = {child_size.x + margin.horizontal(), child_size.y + margin.vertical()};
+    ImVec2 measured = outer_size(measure_content(content_size(allocation)));
 
-        content_size[main] += outer_size[main];
-        content_size[cross] = std::max(content_size[cross], outer_size[cross]);
-
-        ++flow_count;
+    // line breaks change the cross extent, not the container's intrinsic main extent.
+    if (m_wrap != StackWrap::NoWrap) {
+        const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
+        measured[main] = layout().measured_size()[main];
     }
-
-    const float spacing = flow_count > 0 ? m_spacing * static_cast<float>(flow_count - 1) : 0.0F;
-    content_size[main] += spacing;
-
-    return content_size;
+    return measured;
 }
 
-void Container::arrange_children(ImVec2 content_size) {
+void Container::measure_item(LayoutItem& item, ImVec2 available) const {
+    const NodeLayout& layout = item.node->layout();
+    const ImVec2 measured = item.node->measure_size(item.size);
+    item.preferred = layout.intrinsic_size(measured);
+    item.size = layout.resolve_size(available, measured);
+}
+
+ImVec2 Container::measure_children(ImVec2 content_size, bool intrinsic) const {
     const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
     const int cross = 1 - main;
-    float flow_size = 0.0F;
-    float grow_weight = 0.0F;
-    m_layout_items.clear();
+    const float unbounded = std::numeric_limits<float>::infinity();
+    const bool constrained = std::isfinite(content_size.x) || std::isfinite(content_size.y);
 
-    // resolve each child's cross size, main minimum and main maximum once. retain vector capacity between frames
-    // so redistribution and positioning reuse these results without allocating a new work list on every draw.
+    // border inset arithmetic can leave an exactly fitting line a few float ulps short.
+    const float tolerance = 4.0F * std::numeric_limits<float>::epsilon() * std::abs(content_size[main]);
+
+    m_layout_items.clear();
+    m_layout_lines.clear();
+    LayoutLine line;
+
+    // collect using hypothetical sizes. grow reserves its minimum until the line is complete.
     for (const auto& child : children()) {
         if (!is_flow_child(*child)) continue;
+
         const LayoutSize& request = child->layout().size_spec();
         const LayoutAxis& axis = main == 0 ? request.width : request.height;
         const BoxInsets margin = child->layout_margin();
         const ImVec2 available = stack_available_size(*child, content_size);
 
-        LayoutItem item{child.get(), child->layout().resolve_size(available), std::numeric_limits<float>::infinity(), 0.0F};
+        LayoutItem item{
+            .node = child.get(),
+            .size = child->layout().resolve_size(available),
+            .preferred = child->layout().intrinsic_size(),
+            .margin = margin,
+        };
 
-        if (axis.mode == LayoutSizeMode::Grow) {
+        if (axis.mode == LayoutSizeMode::Grow && std::isfinite(available[main])) {
             const float insets = child->layout().box_insets().axis(main == 0);
             item.size[main] = axis.constrain(0.0F, available[main], insets, child->layout().box_sizing());
-            item.maximum =
-                axis.constrain(std::numeric_limits<float>::infinity(), available[main], insets, child->layout().box_sizing());
-
+            item.maximum = axis.constrain(unbounded, available[main], insets, child->layout().box_sizing());
             item.weight = axis.value;
-            grow_weight += item.weight;
+        } else if (constrained) {
+            measure_item(item, available);
         }
 
-        flow_size += item.size[main] + margin.axis(main == 0);
+        const float extent = item.size[main] + margin.axis(main == 0);
+        const float gap = line.count > 0 ? m_spacing : 0.0F;
+        const float required = line.main_size + gap + extent;
+        if (m_wrap != StackWrap::NoWrap && line.count > 0 && required - content_size[main] > tolerance) {
+            m_layout_lines.push_back(line);
+            line = {.first = m_layout_items.size()};
+        }
+
+        line.main_size += (line.count > 0 ? m_spacing : 0.0F) + extent;
+        line.grow_weight += item.weight;
+        ++line.count;
         m_layout_items.push_back(item);
     }
+    if (line.count > 0) m_layout_lines.push_back(line);
 
-    const float spacing = m_layout_items.empty() ? 0.0F : m_spacing * static_cast<float>(m_layout_items.size() - 1);
-    flow_size += spacing;
-    float remaining = std::max(0.0F, content_size[main] - flow_size);
+    ImVec2 measured{};
+    for (auto& current : m_layout_lines) {
+        resolve_line(current, content_size, intrinsic);
+        measured[main] = std::max(measured[main], current.main_size);
+        measured[cross] += current.cross_size;
+    }
+    if (!m_layout_lines.empty()) measured[cross] += m_spacing * static_cast<float>(m_layout_lines.size() - 1);
+    return measured;
+}
 
-    // start at the minima and distribute the remaining extent by weight. reaching a maximum removes that child
-    // from later shares. stop after an uncapped pass, which consumes the remainder apart from float rounding.
+void Container::resolve_line(LayoutLine& line, ImVec2 available, bool intrinsic) const {
+    const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
+    const int cross = 1 - main;
+    float remaining = std::max(0.0F, available[main] - line.main_size);
+    float grow_weight = line.grow_weight;
+
+    // reaching a maximum removes that item from later shares. an uncapped pass consumes the remainder.
     while (remaining > 0.0F && grow_weight > 0.0F) {
         const float previous_weight = grow_weight;
         const float share = remaining / grow_weight;
 
-        for (auto& item : m_layout_items) {
+        for (size_t index = line.first; index < line.first + line.count; ++index) {
+            auto& item = m_layout_items[index];
             if (item.weight == 0.0F) {
                 continue;
             }
@@ -171,7 +210,7 @@ void Container::arrange_children(ImVec2 content_size) {
             const float extent = std::min(item.maximum, old_extent + (share * item.weight));
 
             remaining -= extent - old_extent;
-            flow_size += extent - old_extent;
+            line.main_size += extent - old_extent;
             item.size[main] = extent;
 
             if (extent == item.maximum) {
@@ -185,15 +224,74 @@ void Container::arrange_children(ImVec2 content_size) {
         }
     }
 
-    float cursor = (content_size[main] - flow_size) * m_content_alignment[main];
-    for (const auto& item : m_layout_items) {
-        const BoxInsets margin = item.node->layout_margin();
-        ImVec2 child_offset = {margin.left, margin.top};
-        child_offset[main] += cursor;
-        child_offset[cross] += (content_size[cross] - item.size[cross] - margin.axis(cross == 0)) * m_content_alignment[cross];
+    // final main allocations determine width-dependent content. keep natural extents separate from stretch sizes.
+    const LayoutSize& own = layout().size_spec();
+    const LayoutAxis& own_cross = cross == 0 ? own.width : own.height;
+    float preferred_main = m_spacing * static_cast<float>(line.count - 1);
+    for (size_t index = line.first; index < line.first + line.count; ++index) {
+        auto& item = m_layout_items[index];
+        const LayoutSize& request = item.node->layout().size_spec();
+        const LayoutAxis& axis = main == 0 ? request.width : request.height;
+        const LayoutAxis& cross_axis = cross == 0 ? request.width : request.height;
 
-        arrange_child(*item.node, item.size, {.offset = child_offset});
-        cursor += item.size[main] + margin.axis(main == 0) + m_spacing;
+        if (axis.mode == LayoutSizeMode::Grow && line.grow_weight > 0.0F) {
+            ImVec2 child_available = stack_available_size(*item.node, available);
+            const float assigned = item.size[main];
+            measure_item(item, child_available);
+            item.size[main] = assigned;
+        }
+
+        const bool natural_cross =
+            cross_axis.mode == LayoutSizeMode::Grow || (intrinsic && own_cross.mode == LayoutSizeMode::Fit);
+        const float extent = natural_cross ? item.preferred[cross] : item.size[cross];
+        line.cross_size = std::max(line.cross_size, extent + item.margin.axis(cross == 0));
+        preferred_main += item.preferred[main] + item.margin.axis(main == 0);
+    }
+
+    // intrinsic measurement ignores unresolved percentages and grow allocations on a single line.
+    if (intrinsic && m_wrap == StackWrap::NoWrap) line.main_size = preferred_main;
+}
+
+void Container::arrange_children(ImVec2 content_size) {
+    const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
+    const int cross = 1 - main;
+    const ImVec2 measured = measure_children(content_size, false);
+    if (m_layout_lines.empty()) return;
+
+    // align-content: stretch divides spare cross space between lines, including a single wrapped line.
+    const bool wrapping = m_wrap != StackWrap::NoWrap;
+    const float extra = std::max(0.0F, content_size[cross] - measured[cross]) / static_cast<float>(m_layout_lines.size());
+    float cross_cursor = 0.0F;
+
+    for (const auto& line : m_layout_lines) {
+        const float cross_size = wrapping ? line.cross_size + extra : content_size[cross];
+        float cursor = (content_size[main] - line.main_size) * m_content_alignment[main];
+
+        for (size_t index = line.first; index < line.first + line.count; ++index) {
+            auto& item = m_layout_items[index];
+            const LayoutSize& request = item.node->layout().size_spec();
+            const LayoutAxis& cross_axis = cross == 0 ? request.width : request.height;
+            if (cross_axis.mode == LayoutSizeMode::Grow) {
+                const ImVec2 available = stack_available_size(*item.node, content_size);
+                item.size[cross] = std::max(0.0F, cross_size - item.margin.axis(cross == 0));
+                item.size[cross] = item.node->layout().constrain_size(item.size, available)[cross];
+            }
+
+            ImVec2 offset{item.margin.left, item.margin.top};
+            if (m_wrap == StackWrap::WrapReverse) {
+                offset[cross] = cross == 0 ? item.margin.right : item.margin.bottom;
+            }
+            offset[main] += cursor;
+            offset[cross] +=
+                cross_cursor + (cross_size - item.size[cross] - item.margin.axis(cross == 0)) * m_content_alignment[cross];
+            if (m_wrap == StackWrap::WrapReverse) {
+                offset[cross] = content_size[cross] - offset[cross] - item.size[cross];
+            }
+
+            arrange_child(*item.node, item.size, {.offset = offset});
+            cursor += item.size[main] + item.margin.axis(main == 0) + m_spacing;
+        }
+        cross_cursor += cross_size + m_spacing;
     }
 }
 
@@ -242,7 +340,7 @@ void Container::draw_children() {
         placement.offset.x += (margin.left * (1.0F - origin.x)) - (margin.right * origin.x);
         placement.offset.y += (margin.top * (1.0F - origin.y)) - (margin.bottom * origin.y);
         const ImVec2 child_available = stack_available_size(*child, available);
-        const ImVec2 size = child->layout().resolve_size(child_available);
+        const ImVec2 size = child->resolve_size(child_available);
         arrange_child(*child, size, placement);
         child->draw();
     }

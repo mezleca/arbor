@@ -576,7 +576,7 @@ private:
             page->set_visible(selected);
             if (!selected) continue;
 
-            arrange_child(*page, page->layout().resolve_size(ImGui::GetContentRegionAvail()));
+            arrange_child(*page, page->resolve_size(ImGui::GetContentRegionAvail()));
             page->draw_at_cursor();
             ImGui::EndTabItem();
         }

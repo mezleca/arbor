@@ -23,6 +23,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <algorithm>
 #include <cfloat>
 #include <limits>
@@ -409,6 +410,35 @@ TEST_CASE("text measurement follows style insets animation and line height", "[T
     CHECK(text.layout().size().y == Catch::Approx(expected.y));
 }
 
+TEST_CASE("compact buttons keep their text when bottom borders clip the line", "[ButtonWidget][render][regression]") {
+    Runtime runtime;
+    ui::Surface surface = ui_test::make_surface(runtime);
+    auto& tabs = surface.root().add<Container>("tabs", StackDirection::Horizontal);
+    tabs.set_size({px(300), fit()});
+    auto& button = tabs.add<ButtonWidget>("properties");
+    button.set_text_overflow(TextOverflow::Ellipsis);
+    button.configure_all_styles([](Style& style) {
+        style.padding({}).font_size(25).color(rgb(27, 194, 67)).overflow(Overflow::Hidden);
+        style.background_color(rgba(0, 0, 0, 0)).border(BorderEdge{0, BorderType::None}).border_color(rgb(100, 100, 100));
+    });
+    const auto context = ui_test::prepare_surface(surface, {400, 200});
+    SECTION("button border") {
+        button.configure_all_styles([](Style& style) { style.border_bottom(1.5F); });
+    }
+    SECTION("tab bar border") {
+        tabs.configure_all_styles([](Style& style) { style.border_bottom(1.5F); });
+    }
+    ui_test::draw_surface(surface);
+
+    int text_vertices = 0;
+    for (const auto* window : ImGui::GetCurrentContext()->Windows) {
+        for (const auto& vertex : window->DrawList->VtxBuffer) {
+            if (vertex.col == IM_COL32(27, 194, 67, 255)) ++text_vertices;
+        }
+    }
+    CHECK(text_vertices > 0);
+}
+
 TEST_CASE("wrapped ellipsis truncates the last visible line", "[TextWidget][render][regression]") {
     ui_test::ImGuiContext context({400.0F, 200.0F});
     ImGui::NewFrame();
@@ -433,6 +463,11 @@ TEST_CASE("wrapped ellipsis truncates the last visible line", "[TextWidget][rend
     const int count = draw_list->VtxBuffer.Size - start;
     CHECK(count > 0);
     CHECK(count < whole_vertices);
+
+    const ImVec4 partial_next_line = {clip.x, clip.y, clip.z, clip.w + height * 0.5F};
+    const int partial_start = draw_list->VtxBuffer.Size;
+    Painter(*draw_list).text_ellipsis(position, rgb(1, 1, 1), text, partial_next_line);
+    CHECK(draw_list->VtxBuffer.Size - partial_start == count);
 
     // imgui floors child extents, so a fitting line can end up one pixel wider than its content rect.
     TextValue fitting("MMMMMM");

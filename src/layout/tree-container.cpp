@@ -10,21 +10,19 @@ TreeContainer::TreeContainer(std::string label, std::string id)
     set_size({grow(), fit()});
 }
 
-void TreeContainer::on_measure() {
-    Container::on_measure();
-
-    ImVec2 size = layout().intrinsic_size();
-    if (!m_open) {
-        size.y = 0.0F;
-    }
+ImVec2 TreeContainer::measure_content(ImVec2 available) const {
+    const float indent = ImGui::GetStyle().IndentSpacing;
+    const float header = ImGui::GetFrameHeightWithSpacing();
+    ImVec2 size = measure_children({std::max(0.0F, available.x - indent), std::max(0.0F, available.y - header)});
+    if (!m_open) size.y = 0.0F;
 
     if (size.x > 0.0F) {
-        size.x += ImGui::GetStyle().IndentSpacing;
+        size.x += indent;
     }
 
     size.x = std::max(size.x, ImGui::CalcTextSize(m_label.c_str()).x);
-    size.y += ImGui::GetFrameHeightWithSpacing();
-    set_measured_size(size);
+    size.y += header;
+    return size;
 }
 
 bool TreeContainer::paint() {

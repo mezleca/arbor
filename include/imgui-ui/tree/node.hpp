@@ -178,6 +178,12 @@ namespace ui {
 
         virtual BoxInsets layout_margin() const;
 
+        /// resolves an outer allocation, including content that depends on the available size.
+        ImVec2 resolve_size(ImVec2 available) const;
+
+        /// measures preferred outer content using an already resolved allocation. does not change the allocation.
+        virtual ImVec2 measure_size(ImVec2 allocation) const;
+
         /// sets {width, height} using independent px(), percent(), fit() or grow() rules. preserves placement and in_flow.
         /// styled nodes write the request to every style state. invalidates measurements so the next layout pass resolves it.
         /// layout().size() is the outer allocation, while layout().size_spec() retains these rules.
