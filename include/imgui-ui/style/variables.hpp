@@ -20,14 +20,12 @@ namespace ui {
 
         template <typename T>
         T* get(std::string_view key) {
-            StyleValue* value = find(key);
-            return value == nullptr ? nullptr : std::get_if<T>(value);
+            return std::get_if<T>(find(key));
         }
 
         template <typename T>
         const T* get(std::string_view key) const {
-            const StyleValue* value = find(key);
-            return value == nullptr ? nullptr : std::get_if<T>(value);
+            return std::get_if<T>(find(key));
         }
 
         StyleValue* find(std::string_view key);

@@ -34,6 +34,7 @@ namespace ui {
         Widget& on_change(std::function<void()> callback);
 
     protected:
+        void set_label_layout(LabelPlacement placement, ImVec2 spacing);
         void notify_change();
         void dispatch_event(UiEvent& event) override;
         virtual void click_event(UiEvent&) {}

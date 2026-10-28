@@ -333,7 +333,7 @@ bool Style::lerp(Style& style, const Style& target, float dt) {
         std::visit(
             [&](auto& current_value) {
                 using T = std::decay_t<decltype(current_value)>;
-                const T* typed_target = target_value == nullptr ? nullptr : std::get_if<T>(target_value);
+                const T* typed_target = std::get_if<T>(target_value);
                 if (typed_target != nullptr) {
                     current_value.tick(*typed_target, dt);
                 }

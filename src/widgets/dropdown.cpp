@@ -152,8 +152,7 @@ void DropdownWidget::Body::apply_theme_defaults(const Theme& theme) {
 }
 
 void DropdownWidget::Body::rebuild_options() {
-    const auto live_count =
-        std::count_if(children().begin(), children().end(), [](const auto& child) { return !child->removal_pending(); });
+    const auto live_count = std::ranges::count(children(), false, &Node::removal_pending);
     if (static_cast<std::size_t>(live_count) == m_owner.m_options.size()) {
         std::size_t index = 0;
         for (const auto& child : children()) {
@@ -216,9 +215,7 @@ void DropdownWidget::Body::on_update(float) {
 }
 
 const DropdownOption* DropdownWidget::find_option(std::string_view option_value) const {
-    const auto option = std::find_if(m_options.begin(), m_options.end(), [option_value](const DropdownOption& candidate) {
-        return candidate.value == option_value;
-    });
+    const auto option = std::ranges::find(m_options, option_value, &DropdownOption::value);
     return option == m_options.end() ? nullptr : &*option;
 }
 
@@ -317,10 +314,8 @@ DropdownWidget& DropdownWidget::set_label(std::string label, LabelPlacement plac
 }
 
 void DropdownWidget::update_label_layout() {
-    const bool inline_label = m_label_placement == LabelPlacement::Inline;
-    set_direction(inline_label ? StackDirection::Horizontal : StackDirection::Vertical);
-    set_content_alignment({0.0F, inline_label ? 0.5F : 0.0F});
-    set_spacing(inline_label ? m_label_spacing.x : m_label_spacing.y);
+    set_content_alignment({0.0F, m_label_placement == LabelPlacement::Inline ? 0.5F : 0.0F});
+    set_label_layout(m_label_placement, m_label_spacing);
 }
 
 bool DropdownWidget::select_value(std::string_view value) {

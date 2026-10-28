@@ -136,7 +136,7 @@ public:
         }
 
         context->OpenPopupStack.resize(static_cast<int>(m_popups.size()));
-        std::copy(m_popups.begin(), m_popups.end(), context->OpenPopupStack.begin());
+        std::ranges::copy(m_popups, context->OpenPopupStack.begin());
     }
 
     void clear() {
@@ -1225,7 +1225,7 @@ void Debugger::render_style_variables(Style& style, std::span<Style*> all_styles
         }
     }
 
-    std::sort(m_variable_names.begin(), m_variable_names.end());
+    std::ranges::sort(m_variable_names);
     m_variable_names.erase(std::unique(m_variable_names.begin(), m_variable_names.end()), m_variable_names.end());
 
     if (m_variable_names.empty()) {

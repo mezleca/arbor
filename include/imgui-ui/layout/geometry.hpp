@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 namespace ui {
     struct Anchor {
@@ -130,9 +131,7 @@ namespace ui {
     };
 
     struct LayoutConfig {
-        bool operator==(const LayoutConfig& other) const {
-            return size == other.size && placement == other.placement && in_flow == other.in_flow;
-        }
+        bool operator==(const LayoutConfig&) const = default;
 
         LayoutSize size{};
         Placement placement{};
@@ -200,7 +199,7 @@ namespace ui {
     Rect viewport_work_area();
 
     constexpr ResizeAxes operator&(ResizeAxes left, ResizeAxes right) {
-        return static_cast<ResizeAxes>(static_cast<uint8_t>(left) & static_cast<uint8_t>(right));
+        return static_cast<ResizeAxes>(std::to_underlying(left) & std::to_underlying(right));
     }
 
     class NodeLayout {

@@ -31,7 +31,6 @@ namespace ui {
         class FieldNode;
 
         void on_draw_end() override;
-        void update_label_layout();
 
         WidgetValue<std::string> m_value;
         TextWidget* m_label_node = nullptr;

@@ -863,6 +863,40 @@ TEST_CASE("style cursor follows hovered nodes", "[Style][cursor]") {
     });
 }
 
+TEST_CASE("thick solid borders reach the requested outer bounds", "[Painter][border][regression]") {
+    ui_test::ImGuiContext context({160.0F, 160.0F});
+    Style style;
+    style.background_color(rgba(0, 0, 0, 0)).border(BorderEdge{6.0F, BorderType::Solid}).border_color(rgb(255, 0, 0));
+    const Rect rect{{32.0F, 32.0F}, {96.0F, 96.0F}};
+
+    ui_test::draw_window("thick-border-bounds", [&] {
+        ImDrawList& draw_list = *ImGui::GetWindowDrawList();
+        const int first_vertex = draw_list.VtxBuffer.Size;
+        const Painter painter(draw_list);
+        SECTION("frame") {
+            painter.frame_surface(rect, style);
+        }
+        SECTION("standalone border") {
+            painter.border(rect, style, style.border_color().value);
+        }
+
+        REQUIRE(draw_list.VtxBuffer.Size > first_vertex);
+        ImVec2 minimum = rect.max;
+        ImVec2 maximum = rect.min;
+        for (int index = first_vertex; index < draw_list.VtxBuffer.Size; ++index) {
+            const ImVec2 position = draw_list.VtxBuffer[index].pos;
+            minimum.x = std::min(minimum.x, position.x);
+            minimum.y = std::min(minimum.y, position.y);
+            maximum.x = std::max(maximum.x, position.x);
+            maximum.y = std::max(maximum.y, position.y);
+        }
+        CHECK(minimum.x <= rect.min.x + 1.0F);
+        CHECK(minimum.y <= rect.min.y + 1.0F);
+        CHECK(maximum.x >= rect.max.x - 1.0F);
+        CHECK(maximum.y >= rect.max.y - 1.0F);
+    });
+}
+
 TEST_CASE("border alpha fades out when a hover state is cleared", "[VisualState][transition]") {
     VisualState state;
     const Color accent = rgb(233, 30, 115);

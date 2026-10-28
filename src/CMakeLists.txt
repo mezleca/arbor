@@ -40,7 +40,7 @@ if(IMGUI_UI_ENABLE_SANITIZERS)
 endif()
 target_precompile_headers(imgui-ui-core PRIVATE <imgui.h>)
 
-target_compile_features(imgui-ui-core PUBLIC cxx_std_20)
+target_compile_features(imgui-ui-core PUBLIC cxx_std_23)
 target_include_directories(imgui-ui-core
     PUBLIC "${PROJECT_SOURCE_DIR}/include"
 )

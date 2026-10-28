@@ -8,22 +8,22 @@
 
 using namespace ui;
 
-static void draw_full_frame(ImDrawList& draw_list, Rect rect, const ComputedStyle& style, ImColor background, ImColor border) {
+void Painter::draw_full_frame(Rect rect, const ComputedStyle& style, ImColor background, ImColor border) const {
     const float border_thickness = style.border_thickness();
     if (border_thickness <= 0.0F) {
-        draw_list.AddRectFilled(rect.min, rect.max, background, style.border_radius());
+        m_draw_list.AddRectFilled(rect.min, rect.max, background, style.border_radius());
         return;
     }
 
-    const float inset = border_thickness * 0.5F;
-    draw_list.AddRectFilled(
+    const float inset = border_thickness * BORDER_STROKE_INSET_SCALE;
+    m_draw_list.AddRectFilled(
         {rect.min.x + border_thickness, rect.min.y + border_thickness},
         {rect.max.x - border_thickness, rect.max.y - border_thickness}, background,
         std::max(0.0F, style.border_radius() - border_thickness)
     );
-    draw_list.AddRect(
+    m_draw_list.AddRect(
         {rect.min.x + inset, rect.min.y + inset}, {rect.max.x - inset, rect.max.y - inset}, border, style.border_radius(),
-        ImDrawFlags_RoundCornersAll, border_thickness
+        border_thickness
     );
 }
 
@@ -44,7 +44,7 @@ void Painter::frame_surface(Rect rect, const ComputedStyle& style, const std::op
         ImColor frame_border = draw_border_color;
         if (gradient_border) frame_border.Value.w = 0.0F;
 
-        draw_full_frame(m_draw_list, rect, style, background, frame_border);
+        draw_full_frame(rect, style, background, frame_border);
         if (gradient_border &&
             !draw_gradient_rect(
                 *m_effects, m_draw_list, rect, border_color, style.border_radius(), m_alpha, style.border_thickness()

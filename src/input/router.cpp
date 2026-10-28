@@ -12,7 +12,7 @@ static InputState set_input_flag(InputState state, bool InputState::* flag, bool
 }
 
 static int pointer_button_index(PointerButton button) {
-    const int index = static_cast<int>(button) - 1;
+    const int index = std::to_underlying(button) - 1;
     return index >= 0 && index < static_cast<int>(POINTER_BUTTON_COUNT) ? index : -1;
 }
 
@@ -111,8 +111,7 @@ void InputRouter::set_hovered(const HitTestIndex::Route& route) {
     if (!is_input_target(owner)) owner = nullptr;
 
     for (Node* node : m_hovered_nodes) {
-        const bool hit =
-            std::any_of(route.targets.begin(), route.targets.end(), [node](const auto& entry) { return entry.node == node; });
+        const bool hit = std::ranges::contains(route.targets, node, &HitTestIndex::Entry::node);
         if (!hit && node != owner) node->set_input_state(set_input_flag(node->input_state(), &InputState::hovered, false));
     }
 
@@ -273,7 +272,7 @@ bool InputRouter::dispatch_release(UiEvent& event) {
     std::vector<Node*> released;
     route_pointer(event, &released);
 
-    const bool released_all = std::none_of(m_pressed.begin(), m_pressed.end(), [](const auto& press) { return press.down; });
+    const bool released_all = !std::ranges::contains(m_pressed, true, &PressedPointer::down);
 
     // preserve capture transferred by the release handler. an intercepted release cancels the unfinished interaction.
     if (m_pointer_capture == captured) {
@@ -296,9 +295,7 @@ bool InputRouter::dispatch_click(UiEvent& release, PressedPointer& pressed, cons
     }
 
     // intersect pressed and released targets before delivering a click through the same pointer route.
-    std::erase_if(pressed.targets, [&released](Node* node) {
-        return std::find(released.begin(), released.end(), node) == released.end();
-    });
+    std::erase_if(pressed.targets, [&released](Node* node) { return !std::ranges::contains(released, node); });
 
     if (pressed.targets.empty()) return release.handled;
 
@@ -319,7 +316,7 @@ void InputRouter::dispatch_branch(Node& target, UiEvent& event, std::vector<Node
 
     for (Node* current = &target; current != nullptr && !event.propagation_stopped; current = current->parent()) {
         if ((scope != nullptr && !scope->contains(current)) || !is_input_target(current)) break;
-        if (std::find(visited.begin(), visited.end(), current) != visited.end()) break;
+        if (std::ranges::contains(visited, current)) break;
 
         visited.push_back(current);
         current->dispatch_event(event);
@@ -416,8 +413,8 @@ void InputRouter::dispatch_targets(
         if (event.propagation_stopped) break;
 
         if (!still_attached(entry.node)) continue;
-        if (std::find(visited.begin(), visited.end(), entry.node) != visited.end()) continue;
-        if (!eligible.empty() && std::find(eligible.begin(), eligible.end(), entry.node) == eligible.end()) continue;
+        if (std::ranges::contains(visited, entry.node)) continue;
+        if (!eligible.empty() && !std::ranges::contains(eligible, entry.node)) continue;
 
         event.target = entry.node;
         if (entry.callback) {

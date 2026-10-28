@@ -429,10 +429,13 @@ TEST_CASE("scrolled inline layers keep virtual list input separate", "[LayerCont
     auto& demo = surface.root().add<ui::Container>("demo");
     demo.set_size({ui::px(900.0F), ui::px(600.0F)});
     demo.set_scrollable(true).style().padding({12.0F, 12.0F});
+    // wheel routing must not depend on wall-clock time between backend frames.
+    demo.scroll().set_behaviour(ui::ScrollBehavior::Instant);
     demo.add<ui::Container>("before-list").set_size({ui::grow(), ui::px(300.0F)});
 
     auto& list = demo.add<VirtualListProbe>();
     list.set_size({ui::grow(), ui::px(100.0F)});
+    list.scroll().set_behaviour(ui::ScrollBehavior::Instant);
     std::vector<ui::Node*> rows(1000);
     list.set_items(1000, [&list, &rows](size_t index) -> ui::Node& {
         if (rows[index] == nullptr) {
@@ -466,10 +469,6 @@ TEST_CASE("scrolled inline layers keep virtual list input separate", "[LayerCont
         scroll({100.0F, 240.0F});
         draw_frame(surface);
     }
-    for (int frame = 0; frame < 15; ++frame) {
-        draw_frame(surface);
-    }
-
     REQUIRE(list.scrollbar.GetHeight() > 0.0F);
     REQUIRE(list.layout().visual_rect().contains({100.0F, 240.0F}));
     scroll({100.0F, 240.0F});

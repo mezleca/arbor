@@ -14,12 +14,19 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         backend: [core, sdl, raylib, all]
+        imgui: [bundled, v1.92.8]
 
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+      - name: use minimum supported imgui
+        if: matrix.imgui != 'bundled'
+        shell: bash
+        run: |
+          git -C vendor/imgui fetch --depth=1 origin tag "${{ matrix.imgui }}"
+          git -C vendor/imgui checkout --detach "${{ matrix.imgui }}"
       - name: install tools (ubuntu)
         if: runner.os == 'Linux'
         run: >-

@@ -12,13 +12,19 @@ imgui-ui provides:
 
 while keeping full compatibility with imgui internals.
 
-# usage
+## requirements
+
+- **C++23**
+- **Dear ImGui ≥ 1.92.8** (bundled: 1.93.0)
+- **CMake ≥ 3.25**
+- **FreeType**
+
+## usage
 
 ```cmake
 set(IMGUI_UI_BUILD_SDL ON)
 
 # use custom imgui (needs to be set BEFORE including imgui-ui)
-# the minimum supported version is: 1.92.8
 set(IMGUI_UI_IMGUI_DIR "...")
 
 add_subdirectory(vendor/imgui-ui)
@@ -78,4 +84,4 @@ int main() {
 
 <img src="https://github.com/mezleca/imgui-ui/blob/main/assets/images/preview.png?raw=true" width="60%"/><br>
 
-see `examples/` for a complete demo.
+see `examples/` for the complete demo.

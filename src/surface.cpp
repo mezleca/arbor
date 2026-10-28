@@ -177,7 +177,9 @@ void Surface::apply_theme_metrics() {
     style.ItemSpacing = scaled_size(theme.metrics.item_spacing);
     style.ItemInnerSpacing = scaled_size(theme.metrics.item_inner_spacing);
     style.CircleTessellationMaxError = std::max(0.0F, theme.metrics.circle_tessellation_max_error);
+#if IMGUI_VERSION_NUM < 19300
     style.AntiAliasedLinesUseTex = theme.metrics.anti_aliased_lines_use_tex;
+#endif
 }
 
 void Surface::apply_theme_colors() {

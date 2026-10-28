@@ -173,11 +173,9 @@ namespace ui {
 
     template <NumberInputType T>
     void NumberInputWidget<T>::update_label_layout() {
-        const bool inline_label = m_label_placement == LabelPlacement::Inline;
         m_label->set_visible(!m_label->empty());
-        set_direction(inline_label ? StackDirection::Horizontal : StackDirection::Vertical);
-        set_content_alignment({0.0F, inline_label ? 0.5F : 0.0F});
-        set_spacing(inline_label ? m_label_spacing.x : m_label_spacing.y);
+        set_content_alignment({0.0F, m_label_placement == LabelPlacement::Inline ? 0.5F : 0.0F});
+        set_label_layout(m_label_placement, m_label_spacing);
     }
 
     template <NumberInputType T>

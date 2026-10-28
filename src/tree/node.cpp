@@ -436,9 +436,7 @@ std::unique_ptr<Node> Node::detach(Node& child) {
         return nullptr;
     }
 
-    const auto it = std::find_if(m_children.begin(), m_children.end(), [&child](const std::unique_ptr<Node>& candidate) {
-        return candidate.get() == &child;
-    });
+    const auto it = std::ranges::find(m_children, &child, &std::unique_ptr<Node>::get);
     return it == m_children.end() ? nullptr : detach_child(static_cast<size_t>(it - m_children.begin()));
 }
 

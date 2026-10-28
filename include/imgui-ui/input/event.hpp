@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 
 namespace ui {
     class Node;
@@ -52,11 +53,11 @@ namespace ui {
     };
 
     constexpr EventMask operator|(EventMask left, EventMask right) {
-        return static_cast<EventMask>(static_cast<uint16_t>(left) | static_cast<uint16_t>(right));
+        return static_cast<EventMask>(std::to_underlying(left) | std::to_underlying(right));
     }
 
     constexpr EventMask operator&(EventMask left, EventMask right) {
-        return static_cast<EventMask>(static_cast<uint16_t>(left) & static_cast<uint16_t>(right));
+        return static_cast<EventMask>(std::to_underlying(left) & std::to_underlying(right));
     }
 
     constexpr bool contains(EventMask mask, EventMask value) {
@@ -64,8 +65,8 @@ namespace ui {
     }
 
     constexpr EventMask event_mask(EventType type) {
-        const auto index = static_cast<uint8_t>(type);
-        return index <= static_cast<uint8_t>(EventType::Cancel) ? static_cast<EventMask>(1U << index) : EventMask::None;
+        const auto index = std::to_underlying(type);
+        return index <= std::to_underlying(EventType::Cancel) ? static_cast<EventMask>(1U << index) : EventMask::None;
     }
 
     enum class PointerButton : uint8_t {

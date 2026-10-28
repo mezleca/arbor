@@ -100,7 +100,7 @@ void TextInputWidget::apply_theme_defaults(const Theme& theme) {
     set_font(surface().get_primary_font(), theme.controls.font_size);
     const TransitionSpec transition{0.25F, easing::out_quad};
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
-    update_label_layout();
+    set_label_layout(m_label_placement, m_label_spacing);
     m_input_node->set_spacing(theme.metrics.item_inner_spacing.x);
     m_icon_node->set_size({px(18.0F), px(18.0F)});
     m_field_node->set_size({grow(), grow()});
@@ -137,7 +137,7 @@ TextInputWidget& TextInputWidget::set_label(std::string label, LabelPlacement pl
     m_label_node->set_text(std::move(label));
     m_label_node->set_visible(!m_label_node->empty());
     m_label_placement = placement;
-    update_label_layout();
+    set_label_layout(m_label_placement, m_label_spacing);
     return *this;
 }
 
@@ -154,12 +154,6 @@ bool TextInputWidget::set_value(std::string value) {
 
     notify_change();
     return true;
-}
-
-void TextInputWidget::update_label_layout() {
-    const bool above = m_label_placement == LabelPlacement::Above;
-    set_direction(above ? StackDirection::Vertical : StackDirection::Horizontal);
-    set_spacing(above ? m_label_spacing.y : m_label_spacing.x);
 }
 
 void TextInputWidget::on_draw_end() {

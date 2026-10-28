@@ -327,21 +327,15 @@ ColorPickerWidget& ColorPickerWidget::set_label(std::string label, LabelPlacemen
     m_label_node->set_text(std::move(label));
     m_label_node->set_visible(!m_label_node->empty());
     m_label_placement = placement;
-    update_label_layout();
+    set_label_layout(m_label_placement, m_label_spacing);
     return *this;
-}
-
-void ColorPickerWidget::update_label_layout() {
-    const bool inline_label = m_label_placement == LabelPlacement::Inline;
-    set_direction(inline_label ? StackDirection::Horizontal : StackDirection::Vertical);
-    set_spacing(inline_label ? m_label_spacing.x : m_label_spacing.y);
 }
 
 void ColorPickerWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
     set_font(surface().get_primary_font(), theme.controls.font_size);
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
-    update_label_layout();
+    set_label_layout(m_label_placement, m_label_spacing);
 
     const ImVec2 preview_size = {
         (theme.controls.thumb_size * 2.0F) + (theme.metrics.frame_padding.x * 2.0F),

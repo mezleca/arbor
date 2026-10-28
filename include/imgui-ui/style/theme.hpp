@@ -43,6 +43,7 @@ namespace ui {
             ImVec2 item_inner_spacing = {8.0F, 6.0F};
 
             float circle_tessellation_max_error = 0.10F;
+            // imgui 1.92 only, 1.93 always uses textures for anti-aliased lines.
             bool anti_aliased_lines_use_tex = false;
         } metrics;
 

@@ -10,6 +10,12 @@ Widget::Widget(std::string id, StackDirection direction, std::string_view type_n
     set_input_mode(input_mode);
 }
 
+void Widget::set_label_layout(LabelPlacement placement, ImVec2 spacing) {
+    const bool inline_label = placement == LabelPlacement::Inline;
+    set_direction(inline_label ? StackDirection::Horizontal : StackDirection::Vertical);
+    set_spacing(inline_label ? spacing.x : spacing.y);
+}
+
 Widget& Widget::on_event(InputCallback callback) {
     m_on_event = std::move(callback);
 

@@ -35,7 +35,7 @@ void Painter::rect_filled(Rect rect, const Color& source, float rounding, ImDraw
 void Painter::rect_outline(Rect rect, const Color& source, float thickness, float rounding) const {
     if (thickness <= 0.0F) return;
 
-    m_draw_list.AddRect(rect.min, rect.max, color(source), rounding, ImDrawFlags_RoundCornersAll, std::max(1.0F, thickness));
+    m_draw_list.AddRect(rect.min, rect.max, color(source), rounding, std::max(1.0F, thickness));
 }
 
 void Painter::triangle(ImVec2 center, ImVec2 size, const Color& source, TriangleDirection direction) const {
@@ -58,16 +58,16 @@ void Painter::triangle(ImVec2 center, ImVec2 size, const Color& source, Triangle
 }
 
 void Painter::image(ImTextureID texture, Rect rect, ImVec2 uv_min, ImVec2 uv_max, const Color& tint, float rounding) const {
-    m_draw_list.AddImageRounded(texture, rect.min, rect.max, uv_min, uv_max, color(tint), rounding, ImDrawFlags_RoundCornersAll);
+    m_draw_list.AddImageRounded(texture, rect.min, rect.max, uv_min, uv_max, color(tint), rounding);
 }
 
 void Painter::border(Rect rect, const ComputedStyle& style, const Color& source) const {
     const ImColor draw_color = color(source);
     if (style.uniform_border() && style.border_style() == BorderType::Solid) {
-        const float inset = style.border_thickness() * 0.5F;
+        const float inset = style.border_thickness() * BORDER_STROKE_INSET_SCALE;
         m_draw_list.AddRect(
             {rect.min.x + inset, rect.min.y + inset}, {rect.max.x - inset, rect.max.y - inset}, draw_color,
-            std::max(0.0F, style.border_radius() - inset), ImDrawFlags_RoundCornersAll, style.border_thickness()
+            std::max(0.0F, style.border_radius() - inset), style.border_thickness()
         );
         return;
     }

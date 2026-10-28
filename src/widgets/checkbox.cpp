@@ -60,8 +60,7 @@ CheckboxWidget& CheckboxWidget::set_label(std::string label, LabelPlacement plac
         add(detach(last));
     }
     m_label_placement = placement;
-    set_direction(placement == LabelPlacement::Inline ? StackDirection::Horizontal : StackDirection::Vertical);
-    set_spacing(placement == LabelPlacement::Inline ? m_label_spacing.x : m_label_spacing.y);
+    set_label_layout(placement, m_label_spacing);
     return *this;
 }
 

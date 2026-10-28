@@ -179,7 +179,7 @@ StyleAnimationSequence VisualState::animate() {
 }
 
 void VisualState::cancel_animations() {
-    const bool layout_changed = std::any_of(m_animation_slots.begin(), m_animation_slots.end(), [](const auto& slot) {
+    const bool layout_changed = std::ranges::any_of(m_animation_slots, [](const auto& slot) {
         return slot.layout_dirty != nullptr && slot.override.has_value();
     });
 
@@ -236,7 +236,5 @@ AnimationTarget VisualState::target(StyleAnimationSlot& slot) {
 }
 
 bool VisualState::has_animation_overrides() const {
-    return std::any_of(m_animation_slots.begin(), m_animation_slots.end(), [](const auto& slot) {
-        return slot.override.has_value();
-    });
+    return std::ranges::any_of(m_animation_slots, &std::optional<AnimationValue>::has_value, &StyleAnimationSlot::override);
 }

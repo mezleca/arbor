@@ -37,8 +37,7 @@ namespace ui {
         void line(ImVec2 start, ImVec2 end, const Color& source, float thickness) const;
         void circle(ImVec2 center, float radius, const Color& source) const;
         void circle_outline(ImVec2 center, float radius, const Color& source, float thickness) const;
-        void
-        rect_filled(Rect rect, const Color& source, float rounding = 0.0F, ImDrawFlags flags = ImDrawFlags_RoundCornersAll) const;
+        void rect_filled(Rect rect, const Color& source, float rounding = 0.0F, ImDrawFlags flags = ImDrawFlags_None) const;
         void rect_outline(Rect rect, const Color& source, float thickness = 1.0F, float rounding = 0.0F) const;
         void triangle(ImVec2 center, ImVec2 size, const Color& source, TriangleDirection direction) const;
         void image(ImTextureID texture, Rect rect, ImVec2 uv_min, ImVec2 uv_max, const Color& tint, float rounding = 0.0F) const;
@@ -61,6 +60,10 @@ namespace ui {
     private:
         ImColor color(const Color& source) const;
         void frame_effects(Rect rect, const ComputedStyle& style) const;
+        void draw_full_frame(Rect rect, const ComputedStyle& style, ImColor background, ImColor border) const;
+
+        // imgui 1.93 strokes rectangles inside their supplied bounds.
+        static constexpr float BORDER_STROKE_INSET_SCALE = IMGUI_VERSION_NUM < 19300 ? 0.5F : 0.0F;
 
         ImDrawList& m_draw_list;
         PaintState* m_state;

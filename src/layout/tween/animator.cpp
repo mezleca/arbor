@@ -100,7 +100,7 @@ void Animator::update(float dt) {
     std::erase_if(state.steps, [&](const AnimationStep& step) {
         if (step.start > state.time) return false;
 
-        const auto track_it = std::find_if(state.tracks.begin(), state.tracks.end(), [&step](const AnimationTrack& track) {
+        const auto track_it = std::ranges::find_if(state.tracks, [&step](const AnimationTrack& track) {
             return track.target.identity == step.target.identity;
         });
         AnimationValue start =

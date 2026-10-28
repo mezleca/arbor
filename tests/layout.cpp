@@ -76,9 +76,7 @@ TEST_CASE("wrap measures and allocates each line in either direction", "[layout]
     const auto size = [main](LayoutAxis along, LayoutAxis across) {
         return main == 0 ? LayoutSize{along, across} : LayoutSize{across, along};
     };
-    const auto extent = [main](float along, float across) {
-        return main == 0 ? ImVec2{along, across} : ImVec2{across, along};
-    };
+    const auto extent = [main](float along, float across) { return main == 0 ? ImVec2{along, across} : ImVec2{across, along}; };
     Container row("wrapping-row", direction);
     row.set_size(size(px(210), fit()));
     row.set_spacing(10);
@@ -199,7 +197,8 @@ TEST_CASE("nested wrap measurements use the current allocated width", "[layout][
     row.set_size({grow(), fit()});
     row.set_wrap(StackWrap::Wrap);
     row.set_spacing(10);
-    for (int index = 0; index < 3; ++index) row.add<LayoutProbeNode>(ImVec2{100, 30});
+    for (int index = 0; index < 3; ++index)
+        row.add<LayoutProbeNode>(ImVec2{100, 30});
     auto& footer = column.add<LayoutProbeNode>(ImVec2{100, 20});
     SECTION("resize positions siblings on the first frame") {
         for (const auto& [width, height] : {std::pair{220.0F, 70.0F}, std::pair{320.0F, 30.0F}, std::pair{90.0F, 110.0F}}) {
@@ -239,8 +238,10 @@ TEST_CASE("wrapped rows contribute all lines to the scroll extent", "[layout][wr
     auto& row = viewport.add<Container>("scroll-row", StackDirection::Horizontal);
     row.set_size({grow(), fit()});
     row.set_wrap(StackWrap::Wrap);
-    for (int index = 0; index < 10; ++index) row.add<LayoutProbeNode>(ImVec2{100, 20});
-    for (int frame = 0; frame < 3; ++frame) ui_test::draw_node(viewport, "wrap-scroll-window");
+    for (int index = 0; index < 10; ++index)
+        row.add<LayoutProbeNode>(ImVec2{100, 20});
+    for (int frame = 0; frame < 3; ++frame)
+        ui_test::draw_node(viewport, "wrap-scroll-window");
     CHECK(row.layout().size().y == Catch::Approx(100));
     CHECK(viewport.scroll().max().y >= 40);
     viewport.scroll().seek_to({0, 40}, ScrollBehavior::Instant);
@@ -256,7 +257,8 @@ TEST_CASE("tree measurements reserve the wrapped body below the header", "[layou
     auto& row = tree.add<Container>("tree-row", StackDirection::Horizontal);
     row.set_size({grow(), fit()});
     row.set_wrap(StackWrap::Wrap);
-    for (int index = 0; index < 3; ++index) row.add<LayoutProbeNode>(ImVec2{100, 20});
+    for (int index = 0; index < 3; ++index)
+        row.add<LayoutProbeNode>(ImVec2{100, 20});
     draw_open_tree(tree, "wrap-tree-window");
     draw_open_tree(tree, "wrap-tree-window");
     CHECK(row.layout().size().y == Catch::Approx(40));

@@ -40,7 +40,6 @@ namespace ui {
         friend class ColorPickerPreviewNode;
 
         bool native_popup_open() const;
-        void update_label_layout();
 
         WidgetValue<Color> m_value;
         TextWidget* m_label_node = nullptr;

@@ -87,7 +87,7 @@ HitTestIndex::Route HitTestIndex::route_at(ImVec2 position, EventType type) cons
             continue;
 
         // parent geometry is finalized after its children. keep only the deepest hit node of each branch for bubbling.
-        const auto related = std::find_if(route.targets.begin(), route.targets.end(), [&](const Entry& entry) {
+        const auto related = std::ranges::find_if(route.targets, [&](const Entry& entry) {
             return entry.node->contains(it->node) || it->node->contains(entry.node);
         });
         if (related == route.targets.end()) {
