@@ -640,6 +640,7 @@ private:
     int m_integer_value = 25;
     double m_unbounded_value = 1.0;
     std::string m_name = "imgui-ui";
+    std::string m_password = "demo-password";
     std::string m_image_fit = "cover";
     std::string m_theme = "default";
     std::string m_border_style = "solid";
@@ -820,6 +821,11 @@ void DemoScreen::setup_inputs(Container& widgets) {
     auto& name_input = profile.add<TextInputWidget>(m_name, "name");
     name_input.set_icon(ui.runtime().textures().find("demo-file-icon"));
     name_input.set_tooltip("profile name used by this demo screen");
+
+    // set_flags accepts imgui input flags, such as Password, ReadOnly, or AutoSelectAll.
+    auto& password_input = profile.add<TextInputWidget>(m_password, "password");
+    password_input.set_flags(ImGuiInputTextFlags_Password);
+
     auto& enabled = profile.add<CheckboxWidget>(m_enabled, "enabled");
     enabled.set_size({grow(), fit()});
     enabled.set_tooltip("toggles the sample profile");

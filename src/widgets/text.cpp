@@ -3,8 +3,13 @@
 
 #include <imgui.h>
 #include <algorithm>
+#include <utility>
 
 using namespace ui;
+
+TextWidget::TextWidget(std::string text) : StyledNode({}, "Text"), m_text(std::move(text)) {
+    set_size({fit(), fit()});
+}
 
 void TextWidget::apply_theme_defaults(const Theme& theme) {
     configure_all_styles([&theme](Style& style) { style.color(theme.text_color); });

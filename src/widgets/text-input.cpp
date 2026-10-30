@@ -11,10 +11,9 @@
 
 using namespace ui;
 
-class TextInputWidget::FieldNode final : public StyledNode {
+class ui::TextInputFieldNode final : public StyledNode {
 public:
-    FieldNode(WidgetValue<std::string>& value, bool& focus_requested)
-        : StyledNode("text", "TextInput"), m_value(value), m_focus_requested(&focus_requested) {
+    explicit TextInputFieldNode(TextInputWidget& owner) : StyledNode("text", "TextInput"), m_owner(owner) {
         set_size({grow(), fit()});
     }
 
@@ -36,23 +35,23 @@ private:
 
     bool paint() override {
         // transfer the widget's routed focus request to imgui immediately before drawing the native field.
-        if (*m_focus_requested) {
+        if (m_owner.m_focus_requested) {
             ImGui::SetKeyboardFocusHere();
-            *m_focus_requested = false;
+            m_owner.m_focus_requested = false;
         }
 
         ImGui::PushID(this);
         const float padding_y = std::max(0.0F, (layout().size().y - layout().measured_size().y) * 0.5F);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {ImGui::GetStyle().FramePadding.x, padding_y});
         ImGui::SetNextItemWidth(-FLT_MIN);
-        m_changed = m_value.edit([](std::string& value) { return ImGui::InputText("##value", &value); });
+        m_changed =
+            m_owner.m_value.edit([this](std::string& value) { return ImGui::InputText("##value", &value, m_owner.flags()); });
         ImGui::PopStyleVar();
         ImGui::PopID();
         return true;
     }
 
-    WidgetValue<std::string>& m_value;
-    bool* m_focus_requested;
+    TextInputWidget& m_owner;
     bool m_changed = false;
 };
 
@@ -75,7 +74,7 @@ TextInputWidget::TextInputWidget(WidgetValue<std::string> value, std::string lab
     m_icon_node->set_input_enabled(false);
     m_icon_node->set_visible(false);
 
-    m_field_node = &m_input_node->add<FieldNode>(m_value, m_focus_requested);
+    m_field_node = &m_input_node->add<TextInputFieldNode>(*this);
     set_label(std::move(label), placement);
 }
 
@@ -144,6 +143,11 @@ TextInputWidget& TextInputWidget::set_label(std::string label, LabelPlacement pl
 TextInputWidget& TextInputWidget::set_icon(Texture* icon) {
     m_icon_node->set_texture(icon);
     m_icon_node->set_visible(icon != nullptr);
+    return *this;
+}
+
+TextInputWidget& TextInputWidget::set_flags(ImGuiInputTextFlags flags) {
+    m_flags = flags;
     return *this;
 }
 

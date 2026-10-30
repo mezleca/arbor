@@ -18,15 +18,7 @@ namespace ui {
     public:
         explicit ImageWidget(Texture* texture = nullptr);
 
-        ImageWidget& set_texture(Texture* texture) {
-            if (m_texture == texture) {
-                return *this;
-            }
-
-            m_texture = texture;
-            invalidate_measure();
-            return *this;
-        }
+        ImageWidget& set_texture(Texture* texture);
 
         ImageWidget& set_fit(ImageFit fit) {
             m_fit = fit;
@@ -36,6 +28,7 @@ namespace ui {
     private:
         ImVec2 measure_content(ImVec2 available) const override;
         void paint_content(const PaintContext& context) override;
+
         Texture* m_texture = nullptr;
         ImageFit m_fit = ImageFit::Fill;
     };

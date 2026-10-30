@@ -59,10 +59,9 @@ FileDialogWidget& FileDialogWidget::set_label(std::string label, LabelPlacement 
 
 void FileDialogWidget::update_label_layout() {
     const bool inline_label = m_label_placement == LabelPlacement::Inline;
-    set_direction(inline_label ? StackDirection::Horizontal : StackDirection::Vertical);
     set_content_alignment({0.0F, inline_label ? 0.5F : 0.0F});
     m_label.set_visible(!m_label.empty());
-    set_spacing(inline_label ? m_label_spacing.x : m_label_spacing.y);
+    set_label_layout(m_label_placement, m_label_spacing);
 }
 
 FileDialogWidget& FileDialogWidget::set_operation(FileDialogOperation operation) {

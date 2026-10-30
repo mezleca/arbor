@@ -10,7 +10,16 @@
 
 namespace ui {
     class TextWidget;
+    class DropdownBody;
+    class DropdownOptionNode;
+    class DropdownTrigger;
     struct Theme;
+
+    enum class DropdownVisibility : uint8_t {
+        Closed,
+        Open,
+        Closing,
+    };
 
     struct DropdownOption {
         std::string label;
@@ -38,7 +47,7 @@ namespace ui {
         void close();
 
         bool is_open() const {
-            return m_visibility == Visibility::Open;
+            return m_visibility == DropdownVisibility::Open;
         }
 
         TextWidget& label() {
@@ -53,15 +62,9 @@ namespace ui {
         void apply_theme_defaults(const Theme& theme) override;
 
     private:
-        class Body;
-        class Option;
-        class Trigger;
-
-        enum class Visibility : uint8_t {
-            Closed,
-            Open,
-            Closing,
-        };
+        friend class DropdownBody;
+        friend class DropdownOptionNode;
+        friend class DropdownTrigger;
 
         const DropdownOption* find_option(std::string_view option_value) const;
         const DropdownOption* selected_option() const;
@@ -77,9 +80,9 @@ namespace ui {
         std::vector<DropdownOption> m_options;
         std::string m_placeholder = "select an option";
         TextWidget* m_label_node = nullptr;
-        Body* m_body = nullptr;
-        Trigger* m_trigger = nullptr;
-        Visibility m_visibility = Visibility::Closed;
+        DropdownBody* m_body = nullptr;
+        DropdownTrigger* m_trigger = nullptr;
+        DropdownVisibility m_visibility = DropdownVisibility::Closed;
         LabelPlacement m_label_placement = LabelPlacement::Above;
         ImVec2 m_label_spacing = {8.0F, 10.0F};
     };

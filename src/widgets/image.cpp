@@ -9,6 +9,16 @@ ImageWidget::ImageWidget(Texture* texture) : Widget({}, "Image", InputMode::None
     set_size({fit(), fit()});
 }
 
+ImageWidget& ImageWidget::set_texture(Texture* texture) {
+    if (m_texture == texture) {
+        return *this;
+    }
+
+    m_texture = texture;
+    invalidate_measure();
+    return *this;
+}
+
 ImVec2 ImageWidget::measure_content(ImVec2 available) const {
     const ImVec2 children_size = measure_children(available);
     if (m_texture != nullptr) {

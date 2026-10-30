@@ -9,6 +9,7 @@ namespace ui {
     class Texture;
     class ImageWidget;
     class TextWidget;
+    class TextInputFieldNode;
 
     class TextInputWidget : public Widget {
     public:
@@ -19,6 +20,11 @@ namespace ui {
 
         TextInputWidget& set_label(std::string label, LabelPlacement placement = LabelPlacement::Inline);
         TextInputWidget& set_icon(Texture* icon);
+        TextInputWidget& set_flags(ImGuiInputTextFlags flags);
+        ImGuiInputTextFlags flags() const {
+            return m_flags;
+        }
+
         bool set_value(std::string value);
 
     protected:
@@ -28,7 +34,7 @@ namespace ui {
         Rect hit_rect(Rect visual_rect) const override;
 
     private:
-        class FieldNode;
+        friend class TextInputFieldNode;
 
         void on_draw_end() override;
 
@@ -36,9 +42,10 @@ namespace ui {
         TextWidget* m_label_node = nullptr;
         Container* m_input_node = nullptr;
         ImageWidget* m_icon_node = nullptr;
-        FieldNode* m_field_node = nullptr;
+        TextInputFieldNode* m_field_node = nullptr;
         LabelPlacement m_label_placement = LabelPlacement::Inline;
         ImVec2 m_label_spacing;
+        ImGuiInputTextFlags m_flags = ImGuiInputTextFlags_None;
         bool m_focus_requested = false;
     };
 } // namespace ui

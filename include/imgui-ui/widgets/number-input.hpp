@@ -17,6 +17,9 @@ namespace ui {
     concept NumberInputType = std::is_arithmetic_v<T> && !std::same_as<T, bool> && sizeof(T) <= sizeof(std::uint64_t);
 
     template <NumberInputType T>
+    class NumberInputFieldNode;
+
+    template <NumberInputType T>
     class NumberInputWidget : public Widget {
     public:
         explicit NumberInputWidget(
@@ -34,24 +37,28 @@ namespace ui {
         NumberInputWidget& set_thumb_visible(bool visible);
         NumberInputWidget& set_thumb_size(float size);
         NumberInputWidget& set_thumb_color(Color color);
+        NumberInputWidget& set_flags(ImGuiSliderFlags flags);
+        ImGuiSliderFlags flags() const {
+            return m_flags;
+        }
+
         bool set_value(T value);
 
     protected:
         void apply_theme_defaults(const Theme& theme) override;
 
     private:
-        class FieldNode;
+        friend class NumberInputFieldNode<T>;
 
         static constexpr ImGuiDataType scalar_type();
         void update_label_layout();
-        void value_changed();
         Rect hit_rect(Rect visual_rect) const override;
         void mouse_press_event(UiEvent& event) override;
         bool draw_value();
 
         WidgetValue<T> m_value;
         TextWidget* m_label = nullptr;
-        FieldNode* m_field = nullptr;
+        NumberInputFieldNode<T>* m_field = nullptr;
         std::string m_format;
         std::optional<double> m_minimum = 0;
         std::optional<double> m_maximum = 100;
@@ -60,13 +67,15 @@ namespace ui {
         ImVec2 m_label_spacing;
         float m_speed;
         float m_thumb_size = 10.0F;
+        ImGuiSliderFlags m_flags = ImGuiSliderFlags_None;
         bool m_thumb_visible = true;
     };
 
     template <NumberInputType T>
-    class NumberInputWidget<T>::FieldNode final : public Widget {
+    class NumberInputFieldNode final : public Widget {
     public:
-        explicit FieldNode(NumberInputWidget& owner) : Widget("input", "NumberInputField", InputMode::None), m_owner(owner) {
+        explicit NumberInputFieldNode(NumberInputWidget<T>& owner)
+            : Widget("input", "NumberInputField", InputMode::None), m_owner(owner) {
             set_size({grow(), grow()});
         }
 
@@ -94,7 +103,7 @@ namespace ui {
             ImGui::SetNextItemWidth(layout().size().x);
 
             if (m_owner.draw_value()) {
-                m_owner.value_changed();
+                m_owner.notify_change();
             }
 
             set_interaction_style(ImGui::IsItemHovered(), ImGui::IsItemActive(), m_owner.input_state().focused);
@@ -109,7 +118,7 @@ namespace ui {
             return true;
         }
 
-        NumberInputWidget& m_owner;
+        NumberInputWidget<T>& m_owner;
     };
 
     template <NumberInputType T>
@@ -118,7 +127,7 @@ namespace ui {
           m_speed(std::floating_point<T> ? 0.1F : 1.0F) {
         set_size({grow(), fit()});
         m_label = &add<TextWidget>("");
-        m_field = &add<FieldNode>(*this);
+        m_field = &add<NumberInputFieldNode<T>>(*this);
         set_label(std::move(label), placement);
     }
 
@@ -176,11 +185,6 @@ namespace ui {
         m_label->set_visible(!m_label->empty());
         set_content_alignment({0.0F, m_label_placement == LabelPlacement::Inline ? 0.5F : 0.0F});
         set_label_layout(m_label_placement, m_label_spacing);
-    }
-
-    template <NumberInputType T>
-    void NumberInputWidget<T>::value_changed() {
-        notify_change();
     }
 
     template <NumberInputType T>
@@ -252,6 +256,12 @@ namespace ui {
     }
 
     template <NumberInputType T>
+    NumberInputWidget<T>& NumberInputWidget<T>::set_flags(ImGuiSliderFlags flags) {
+        m_flags = flags;
+        return *this;
+    }
+
+    template <NumberInputType T>
     bool NumberInputWidget<T>::set_value(T value) {
         if (!m_value.set(std::move(value))) {
             return false;
@@ -272,10 +282,10 @@ namespace ui {
 
         return m_value.edit([&](T& value) {
             if (m_thumb_visible && m_minimum.has_value() && m_maximum.has_value() && maximum > minimum) {
-                return ImGui::SliderScalar("##value", data_type, &value, &minimum, &maximum, format);
+                return ImGui::SliderScalar("##value", data_type, &value, &minimum, &maximum, format, m_flags);
             }
 
-            return ImGui::DragScalar("##value", data_type, &value, m_speed, minimum_ptr, maximum_ptr, format);
+            return ImGui::DragScalar("##value", data_type, &value, m_speed, minimum_ptr, maximum_ptr, format, m_flags);
         });
     }
 } // namespace ui
