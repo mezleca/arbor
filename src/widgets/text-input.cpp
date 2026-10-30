@@ -151,6 +151,12 @@ TextInputWidget& TextInputWidget::set_flags(ImGuiInputTextFlags flags) {
     return *this;
 }
 
+TextInputWidget& TextInputWidget::set_icon(TextureHandle icon) {
+    m_icon_node->set_visible(icon != nullptr);
+    m_icon_node->set_texture(std::move(icon));
+    return *this;
+}
+
 bool TextInputWidget::set_value(std::string value) {
     if (!m_value.set(std::move(value))) {
         return false;

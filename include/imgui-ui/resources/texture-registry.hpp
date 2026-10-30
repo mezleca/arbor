@@ -1,27 +1,43 @@
 #pragma once
 
-#include "asset-registry.hpp"
+#include "../string-hash.hpp"
+#include "texture.hpp"
 
-#include <cstdio>
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <imgui.h>
 #include <memory>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <unordered_map>
 
 namespace ui {
-    class Texture {
-    public:
-        virtual ~Texture() = default;
-        virtual ImVec2 size() const = 0;
-
-        // the opengl loader creates gpu data lazily for each imgui context and reuses it later.
-        virtual ImTextureID get(ImVec2 size) = 0;
-
-        // release context-local data while retaining the source for later contexts.
-        virtual void release_context(ImGuiContext* context) = 0;
+    enum class TextureRetention : std::uint8_t {
+        // retain cpu and gpu data until context/registry teardown.
+        Resident,
+        // evict idle gpu data under pressure and cpu data only after all handles are released.
+        Cached,
+        // release after the last handle disappears and every gpu context can be collected safely.
+        Transient,
     };
+
+    struct TextureCacheConfig {
+        // global cpu budget and gpu budget per context. referenced/resident data can exceed these limits.
+        std::size_t cpu_budget_bytes = std::numeric_limits<std::size_t>::max();
+        std::size_t gpu_budget_bytes = std::numeric_limits<std::size_t>::max();
+    };
+
+    struct TextureCacheStats {
+        std::size_t entry_count = 0;
+        std::size_t referenced_count = 0;
+        std::size_t cpu_bytes = 0;
+        std::size_t gpu_bytes = 0;
+    };
+
+    class RegistryTexture;
 
     class TextureLoader {
     public:
@@ -32,30 +48,46 @@ namespace ui {
         virtual std::unique_ptr<Texture> load(std::string_view content, std::string id) = 0;
     };
 
-    class TextureRegistry final : public AssetRegistry<Texture> {
+    // registry access and handle use belong to the ui thread. the runtime must outlive its handles.
+    class TextureRegistry final {
     public:
-        explicit TextureRegistry(std::unique_ptr<TextureLoader> loader = nullptr);
+        explicit TextureRegistry(std::unique_ptr<TextureLoader> loader = nullptr, TextureCacheConfig config = {});
+        TextureRegistry(const TextureRegistry&) = delete;
+        TextureRegistry& operator=(const TextureRegistry&) = delete;
 
+        // legacy raw access pins the resource until registry destruction.
         Texture* add(std::string id, const std::filesystem::path& location);
         Texture* add(std::string id, std::string_view content);
+        Texture* find(std::string_view id);
+        const Texture* find(std::string_view id) const;
+
+        // an existing id reuses its source and retention policy. handles protect cpu data, not gpu residency.
+        // io and decoding failures are logged and return an empty handle without registering an entry.
+        TextureHandle
+        acquire(std::string id, const std::filesystem::path& location, TextureRetention retention = TextureRetention::Cached);
+        TextureHandle acquire(std::string id, std::string_view content, TextureRetention retention = TextureRetention::Cached);
+        TextureHandle find_handle(std::string_view id) const;
+
+        void set_cache_config(TextureCacheConfig config);
+        const TextureCacheConfig& cache_config() const;
+        // nullptr sums gpu bytes across all contexts. cpu bytes are always global.
+        TextureCacheStats stats(ImGuiContext* context = nullptr) const;
+
+        // called after rendering with this graphics/imgui context current. nullptr uses the current imgui context.
+        // budgets are soft when referenced, resident, or current-frame resources prevent further eviction.
+        // transient resources are released at the next safe collection after their last handle disappears.
+        void collect(ImGuiContext* context = nullptr);
+        void release_context(ImGuiContext* context);
 
     private:
         template <typename Source>
-        Texture* load_asset(std::string id, Source&& source) {
-            Texture* existing = find(id);
-            if (existing != nullptr) {
-                return existing;
-            }
-
-            if (m_loader == nullptr) {
-                (void)std::fprintf(stderr, "imgui-ui: cannot load texture '%s' without a TextureLoader\n", id.c_str());
-                return nullptr;
-            }
-
-            auto texture = m_loader->load(std::forward<Source>(source), id);
-            return add_asset(std::move(id), std::move(texture));
-        }
+        TextureHandle load_asset(std::string id, Source&& source, TextureRetention retention);
+        static Texture* pin(const TextureHandle& texture);
+        TextureHandle store(std::string id, std::unique_ptr<Texture> texture, TextureRetention retention);
 
         std::unique_ptr<TextureLoader> m_loader;
+        std::unordered_map<std::string, std::shared_ptr<RegistryTexture>, StringHash, std::equal_to<>> m_assets;
+        TextureCacheConfig m_config;
+        mutable std::uint64_t m_access_counter = 0;
     };
 } // namespace ui

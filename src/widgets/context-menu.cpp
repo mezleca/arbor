@@ -109,6 +109,11 @@ void ContextMenuWidget::mouse_move_event(UiEvent& event) {
     root_menu().update_pointer_hover(event.position);
 }
 
+ContextMenuWidget::ContextMenuWidget(ContextMenuItems items, TextureHandle submenu_icon)
+    : ContextMenuWidget(std::move(items), submenu_icon.get()) {
+    set_submenu_icon(std::move(submenu_icon));
+}
+
 void ContextMenuWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
     set_font(surface().get_primary_font(), theme.controls.font_size);
@@ -138,6 +143,9 @@ ContextMenuWidget& ContextMenuWidget::set_items(ContextMenuItems items) {
         }
 
         auto& submenu = add<ContextMenuWidget>(std::move(item.children), m_submenu_icon);
+        if (m_submenu_icon_handle) {
+            submenu.set_submenu_icon(m_submenu_icon_handle);
+        }
         submenu.m_parent_menu = this;
         submenu.set_hover_close_delay(m_hover_close_delay_duration);
         menu_item.m_submenu = &submenu;
@@ -152,6 +160,7 @@ ContextMenuWidget& ContextMenuWidget::set_submenu_icon(Texture* icon) {
     }
 
     m_submenu_icon = icon;
+    m_submenu_icon_handle.reset();
 
     for (ContextMenuItemNode* item : m_items) {
         if (item->m_submenu != nullptr) {
@@ -159,6 +168,17 @@ ContextMenuWidget& ContextMenuWidget::set_submenu_icon(Texture* icon) {
         }
     }
 
+    return *this;
+}
+
+ContextMenuWidget& ContextMenuWidget::set_submenu_icon(TextureHandle icon) {
+    m_submenu_icon = icon.get();
+    m_submenu_icon_handle = std::move(icon);
+    for (ContextMenuItemNode* item : m_items) {
+        if (item->m_submenu != nullptr) {
+            item->m_submenu->set_submenu_icon(m_submenu_icon_handle);
+        }
+    }
     return *this;
 }
 

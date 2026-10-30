@@ -293,6 +293,9 @@ void Surface::end_frame() {
         m_profiler->record_gpu_render_ms(m_backend->render_profiled(draw_data, m_profiler->enabled()));
     }
 
+    // draw data has been consumed. texture collection must run before leaving this surface's graphics context.
+    m_runtime.textures().collect(m_context);
+
     m_profiler->end_frame();
     ImGui::SetCurrentContext(m_previous_context);
     m_previous_context = nullptr;

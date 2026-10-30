@@ -112,7 +112,8 @@ static const nsgif_bitmap_cb_vt gif_bitmap_callbacks = {
 
 class OpenGLTexture final : public Texture {
 public:
-    explicit OpenGLTexture(std::unique_ptr<lunasvg::Document> document) : m_document(std::move(document)) {}
+    OpenGLTexture(std::unique_ptr<lunasvg::Document> document, std::size_t source_bytes)
+        : m_document(std::move(document)), m_source_bytes(source_bytes) {}
 
     ImVec2 size() const override {
         return {m_document->width(), m_document->height()};
@@ -152,9 +153,24 @@ public:
         });
     }
 
+    TextureMemoryUsage memory_usage(ImGuiContext* context) const override {
+        // lunasvg does not expose document allocation sizes. use source bytes as the cpu estimate.
+        TextureMemoryUsage usage{m_source_bytes, 0};
+        for (const auto& [owner, cache] : m_textures) {
+            if (context != nullptr && owner != context) {
+                continue;
+            }
+            for (const auto& [size, id] : cache) {
+                usage.gpu_bytes += static_cast<std::size_t>(size >> 32U) * static_cast<uint32_t>(size) * 4U;
+            }
+        }
+        return usage;
+    }
+
 private:
     std::unordered_map<ImGuiContext*, std::unordered_map<uint64_t, GLuint>> m_textures;
     std::unique_ptr<lunasvg::Document> m_document;
+    std::size_t m_source_bytes;
 };
 
 class OpenGLRasterTexture final : public Texture {
@@ -197,6 +213,13 @@ public:
 
     void release_context(ImGuiContext* context) override {
         release_context_entry(m_textures, context, [](GLuint texture) { glDeleteTextures(1, &texture); });
+    }
+
+    TextureMemoryUsage memory_usage(ImGuiContext* context) const override {
+        const auto bytes =
+            static_cast<std::size_t>(plutovg_surface_get_stride(m_surface)) * plutovg_surface_get_height(m_surface);
+        const auto copies = context == nullptr ? m_textures.size() : static_cast<std::size_t>(m_textures.contains(context));
+        return {bytes, bytes * copies};
     }
 
 private:
@@ -265,6 +288,13 @@ public:
 
     void release_context(ImGuiContext* context) override {
         release_context_entry(m_textures, context, [](const auto& texture) { glDeleteTextures(1, &texture.id); });
+    }
+
+    TextureMemoryUsage memory_usage(ImGuiContext* context) const override {
+        const auto canvas_bytes = static_cast<std::size_t>(m_size.x) * static_cast<std::size_t>(m_size.y) * 4U;
+        const auto copies = context == nullptr ? m_textures.size() : static_cast<std::size_t>(m_textures.contains(context));
+        // decoder metadata and internal frame caches are not exposed by libnsgif.
+        return {m_data.size() + (m_bitmap != nullptr ? m_bitmap->pixels.size() : 0), canvas_bytes * copies};
     }
 
 private:
@@ -367,7 +397,7 @@ std::unique_ptr<Texture> OpenGLTextureLoader::load(const std::filesystem::path& 
         throw std::runtime_error(std::format("failed to load texture {}", location.string()));
     }
 
-    return std::make_unique<OpenGLTexture>(std::move(document));
+    return std::make_unique<OpenGLTexture>(std::move(document), std::filesystem::file_size(location));
 }
 
 std::unique_ptr<Texture> OpenGLTextureLoader::load(std::string_view content, std::string) {
@@ -379,5 +409,5 @@ std::unique_ptr<Texture> OpenGLTextureLoader::load(std::string_view content, std
     if (document == nullptr) {
         throw std::runtime_error("failed to load texture data");
     }
-    return std::make_unique<OpenGLTexture>(std::move(document));
+    return std::make_unique<OpenGLTexture>(std::move(document), content.size());
 }

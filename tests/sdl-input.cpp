@@ -15,6 +15,7 @@
 #include <imgui-ui/widgets/checkbox.hpp>
 #include <imgui-ui/widgets/dropdown.hpp>
 #include <imgui-ui/widgets/file-dialog.hpp>
+#include <imgui-ui/widgets/image.hpp>
 #include <imgui-ui/widgets/number-input.hpp>
 #include <imgui-ui/widgets/text.hpp>
 
@@ -936,6 +937,15 @@ TEST_CASE("svg textures cache uploads by size and release their context", "[text
     REQUIRE(glIsTexture(static_cast<GLuint>(large)) == GL_FALSE);
 }
 
+TEST_CASE("unsupported texture data returns an empty handle", "[texture][regression]") {
+    ui::TextureRegistry textures(std::make_unique<ui::OpenGLTextureLoader>());
+    const auto entries = textures.stats().entry_count;
+    REQUIRE(textures.acquire("unsupported", std::string_view{"not an image"}) == nullptr);
+    REQUIRE(textures.acquire("broken-gif", std::string_view{"GIF89a"}) == nullptr);
+    REQUIRE(textures.add("unsupported-file", std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "../CMakeLists.txt") == nullptr);
+    REQUIRE(textures.stats().entry_count == entries);
+}
+
 TEST_CASE("gif texture data decodes into an opengl texture", "[texture][gif]") {
     static constexpr char gif_data[] = "GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff!\xf9\x04\x01\x00\x00\x00\x00,"
                                        "\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;";
@@ -953,6 +963,52 @@ TEST_CASE("gif texture data decodes into an opengl texture", "[texture][gif]") {
     const ImTextureID id = texture->get(texture->size());
     REQUIRE(id != ImTextureID{});
     REQUIRE(glIsTexture(static_cast<GLuint>(id)) == GL_TRUE);
+}
+
+TEST_CASE("texture cache collects real gpu uploads after rendering and recreates them", "[texture-cache][render]") {
+    SdlVideoSession sdl({128.0F, 128.0F});
+    ui::Runtime runtime({
+        .texture_loader = std::make_unique<ui::OpenGLTextureLoader>(),
+        .texture_cache = {.cpu_budget_bytes = 0, .gpu_budget_bytes = 0},
+    });
+    ui::Surface surface(runtime, {.backend = make_sdl_backend(sdl)});
+    const auto surface_context = ui_test::prepare_surface(surface);
+    ui::TextureHandle texture;
+    SECTION("raster") {
+        texture = runtime.textures().acquire("cover", std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "images/tiny.jpg");
+    }
+    SECTION("svg") {
+        texture =
+            runtime.textures().acquire("cover", std::string_view{R"(<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4">
+                <rect width="4" height="4" fill="#ff00ff"/></svg>)"});
+    }
+    SECTION("gif") {
+        texture = runtime.textures().acquire("cover", std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "images/t3.gif");
+    }
+    REQUIRE(texture != nullptr);
+    auto& image = surface.root().add<ui::ImageWidget>(texture);
+    image.set_size({ui::px(16.0F), ui::px(16.0F)});
+    surface.frame();
+    const ImTextureID first = texture->get({8.0F, 8.0F});
+    REQUIRE(glIsTexture(static_cast<GLuint>(first)) == GL_TRUE);
+    REQUIRE(texture->memory_usage().cpu_bytes > 0);
+    REQUIRE(texture->memory_usage().gpu_bytes > 0);
+
+    image.set_visible(false);
+    surface.frame();
+    REQUIRE(glIsTexture(static_cast<GLuint>(first)) == GL_FALSE);
+    REQUIRE(texture->memory_usage().gpu_bytes == 0);
+    image.set_visible(true);
+    surface.frame();
+    REQUIRE(texture->memory_usage().gpu_bytes > 0);
+    const ImTextureID restored = texture->get({8.0F, 8.0F});
+    REQUIRE(glIsTexture(static_cast<GLuint>(restored)) == GL_TRUE);
+    image.set_texture(nullptr);
+    texture.reset();
+    surface.frame();
+    REQUIRE(glIsTexture(static_cast<GLuint>(restored)) == GL_FALSE);
+    REQUIRE(runtime.textures().find_handle("cover") == nullptr);
+    REQUIRE(glGetError() == GL_NO_ERROR);
 }
 
 TEST_CASE("handled button clicks still release ImGui mouse state", "[input][regression]") {

@@ -9,13 +9,25 @@ ImageWidget::ImageWidget(Texture* texture) : Widget({}, "Image", InputMode::None
     set_size({fit(), fit()});
 }
 
+ImageWidget::ImageWidget(TextureHandle texture) : ImageWidget(texture.get()) {
+    m_texture_handle = std::move(texture);
+}
+
 ImageWidget& ImageWidget::set_texture(Texture* texture) {
     if (m_texture == texture) {
         return *this;
     }
 
     m_texture = texture;
+    m_texture_handle.reset();
     invalidate_measure();
+    return *this;
+}
+
+ImageWidget& ImageWidget::set_texture(TextureHandle texture) {
+    // transfer ownership
+    set_texture(texture.get());
+    m_texture_handle = std::move(texture);
     return *this;
 }
 

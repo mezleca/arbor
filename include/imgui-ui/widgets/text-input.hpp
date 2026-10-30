@@ -2,6 +2,7 @@
 
 #include "widget.hpp"
 #include "value.hpp"
+#include "../resources/texture.hpp"
 
 #include <string>
 
@@ -20,6 +21,7 @@ namespace ui {
 
         TextInputWidget& set_label(std::string label, LabelPlacement placement = LabelPlacement::Inline);
         TextInputWidget& set_icon(Texture* icon);
+        TextInputWidget& set_icon(TextureHandle icon);
         TextInputWidget& set_flags(ImGuiInputTextFlags flags);
         ImGuiInputTextFlags flags() const {
             return m_flags;

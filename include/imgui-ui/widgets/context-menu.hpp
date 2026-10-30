@@ -1,6 +1,7 @@
 #pragma once
 
 #include "widget.hpp"
+#include "../resources/texture.hpp"
 
 #include <functional>
 #include <string>
@@ -33,9 +34,11 @@ namespace ui {
     class ContextMenuWidget : public Widget {
     public:
         explicit ContextMenuWidget(ContextMenuItems items = {}, Texture* submenu_icon = nullptr);
+        ContextMenuWidget(ContextMenuItems items, TextureHandle submenu_icon);
 
         ContextMenuWidget& set_items(ContextMenuItems items);
         ContextMenuWidget& set_submenu_icon(Texture* icon);
+        ContextMenuWidget& set_submenu_icon(TextureHandle icon);
 
         /// sets the delay counted from menu activation before an outside pointer position can close it.
         ContextMenuWidget& set_hover_close_delay(float seconds);
@@ -79,6 +82,7 @@ namespace ui {
         ContextMenuWidget& root_menu();
 
         Texture* m_submenu_icon = nullptr;
+        TextureHandle m_submenu_icon_handle;
         std::vector<ContextMenuItemNode*> m_items;
         ContextMenuWidget* m_parent_menu = nullptr;
         bool m_open = false;

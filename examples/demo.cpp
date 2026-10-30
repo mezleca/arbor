@@ -166,6 +166,10 @@ void configure_demo_runtime(RuntimeConfig& config) {
 
 #ifdef IMGUI_UI_ASSETS_DIR
     config.texture_loader = std::make_unique<OpenGLTextureLoader>();
+
+    // use a global 64 mib cpu budget
+    // and a 128 mib gpu budget per context.
+    config.texture_cache = {.cpu_budget_bytes = 64U * 1024U * 1024U, .gpu_budget_bytes = 128U * 1024U * 1024U};
 #endif
 }
 
@@ -627,7 +631,8 @@ private:
     ResizableContainer* m_dynamic_nodes = nullptr;
     TextWidget* m_dynamic_status = nullptr;
     TextWidget* m_fps = nullptr;
-    float m_fps_update_elapsed = 0.0F;
+    TextWidget* m_texture_status = nullptr;
+    float m_status_update_elapsed = 0.0F;
     Container* m_test_images = nullptr;
     bool m_enabled = true;
     bool m_radio_selected = true;
@@ -692,11 +697,19 @@ void DemoScreen::setup_overview(Container& page, std::string_view backend) {
     // between them. a horizontal container places them side by side. only flowing children contribute to a parent's fit().
     // this panel fills the demo's width, but measures its height from its children. the next panel starts below that height.
     overview.set_size({grow(), fit()});
-    overview.set_direction(StackDirection::Horizontal);
     overview.set_spacing(16.0F);
-    overview.add<TextWidget>(std::format("imgui-ui / {}", backend));
-    m_fps = &overview.add<TextWidget>("fps: 0.0");
-    overview.add<TextWidget>("debugger: shift + d");
+    auto& summary = overview.add<Container>("summary", StackDirection::Horizontal);
+    summary.set_size({grow(), fit()});
+    summary.set_spacing(16.0F);
+    summary.add<TextWidget>(std::format("imgui-ui / {}", backend));
+    m_fps = &summary.add<TextWidget>("fps: 0.0");
+    summary.add<TextWidget>("debugger: shift + d");
+
+    auto& textures = overview.add<Container>("texture-registry");
+    textures.set_size({grow(), fit()});
+    textures.set_spacing(8.0F);
+    textures.add<TextWidget>("texture registry");
+    m_texture_status = &textures.add<TextWidget>("");
 }
 
 void DemoScreen::setup_buttons(Container& widgets) {
@@ -1160,8 +1173,12 @@ void DemoScreen::select_test_image(const FileDialogResult& result) {
         return;
     }
 
-    Texture* texture = surface().runtime().textures().add(result.paths.front().filename().string(), result.paths.front());
-    add_test_image(texture);
+    const auto& path = result.paths.front();
+    // the widget retains a handle. removing it makes the cover eligible for the registry's cache policy.
+    auto texture = surface().runtime().textures().acquire(path.lexically_normal().string(), path);
+    if (texture) {
+        add_test_image(texture.get()).set_texture(std::move(texture));
+    }
 }
 
 ImageFit DemoScreen::image_fit() const {
@@ -1183,10 +1200,21 @@ int& DemoScreen::blur() {
 }
 
 void DemoScreen::on_update(float dt) {
-    m_fps_update_elapsed += std::max(0.0F, dt);
-    if (m_fps_update_elapsed >= 0.25F) {
-        m_fps_update_elapsed = 0.0F;
+    m_status_update_elapsed += std::max(0.0F, dt);
+    if (m_status_update_elapsed >= 0.25F) {
+        m_status_update_elapsed = 0.0F;
         m_fps->set_text(std::format("fps: {:.1f}", ImGui::GetIO().Framerate));
+        const auto textures = surface().runtime().textures().stats(surface().imgui_context());
+        constexpr double mib = 1024.0 * 1024.0;
+        m_texture_status->set_text(
+            std::format(
+                "textures: {} | with active handles: {}\n"
+                "estimated CPU (global): {:.2f} MiB\n"
+                "estimated GPU (this context): {:.2f} MiB",
+                textures.entry_count, textures.referenced_count, static_cast<double>(textures.cpu_bytes) / mib,
+                static_cast<double>(textures.gpu_bytes) / mib
+            )
+        );
     }
 }
 

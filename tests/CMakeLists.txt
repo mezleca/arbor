@@ -5,6 +5,7 @@ add_executable(imgui-ui-tests
     input.cpp
     layout.cpp
     widgets.cpp
+    texture-cache.cpp
     imgui-context.hpp
 )
 
@@ -21,6 +22,7 @@ if(IMGUI_UI_BUILD_SDL)
     )
 
     target_link_libraries(imgui-ui-sdl-tests PRIVATE imgui-ui::sdl Catch2::Catch2WithMain)
+    target_compile_definitions(imgui-ui-sdl-tests PRIVATE IMGUI_UI_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets")
     target_include_directories(imgui-ui-sdl-tests PRIVATE "${IMGUI_UI_IMGUI_DIR}/backends")
     target_precompile_headers(imgui-ui-sdl-tests PRIVATE <catch2/catch_test_macros.hpp> <imgui.h>)
 

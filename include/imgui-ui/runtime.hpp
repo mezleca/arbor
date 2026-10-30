@@ -12,6 +12,7 @@ namespace ui {
         Theme theme{};
         std::filesystem::path performance_directory;
         std::unique_ptr<TextureLoader> texture_loader;
+        TextureCacheConfig texture_cache;
     };
 
     class Runtime {
