@@ -103,20 +103,20 @@ void Node::set_input_state(InputState state) {
 
 void Node::refresh_input_state() {
     // combine direct input with the children's aggregates, then pass the changed aggregate to the parent.
-    for (Node* node = this; node != nullptr; node = node->m_parent) {
-        InputState state = node->m_input_state;
-        for (const auto& child : node->m_children) {
-            if (child->m_removal_pending) continue;
+    InputState state = m_input_state;
+    for (const auto& child : m_children) {
+        if (child->m_removal_pending) continue;
 
-            state.hovered |= child->m_subtree_input_state.hovered;
-            state.active |= child->m_subtree_input_state.active;
-        }
-
-        if (state == node->m_subtree_input_state) break;
-
-        node->m_subtree_input_state = state;
-        node->input_state_changed();
+        state.hovered |= child->m_subtree_input_state.hovered;
+        state.active |= child->m_subtree_input_state.active;
     }
+
+    if (state == m_subtree_input_state) return;
+
+    m_subtree_input_state = state;
+    // ancestor styles must be current before descendants resolve inherited properties.
+    if (m_parent != nullptr) m_parent->refresh_input_state();
+    input_state_changed();
 }
 
 Surface& Node::surface() const {

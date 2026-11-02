@@ -848,16 +848,39 @@ TEST_CASE("style cursor follows hovered nodes", "[Style][cursor]") {
     InputRouter router;
     Widget widget("cursor-widget");
     widget.style(StyleType::HOVER).cursor(ImGuiMouseCursor_Hand);
+    auto& child = widget.add<Widget>("child");
+    Widget background("background");
 
     ui_test::draw_window("style-cursor-test", [&] {
         router.begin_frame();
         router.register_target(widget, {{0.0F, 0.0F}, {40.0F, 20.0F}});
+        router.register_target(child, {{20.0F, 0.0F}, {40.0F, 20.0F}});
+        router.register_target(background, {{80.0F, 80.0F}, {120.0F, 120.0F}});
 
         UiEvent move = ui_test::pointer_event(EventType::PointerMove, {10.0F, 10.0F});
         router.dispatch(move);
         REQUIRE(ImGui::GetMouseCursor() == ImGuiMouseCursor_Hand);
 
+        move.position = {30.0F, 10.0F};
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
+        router.dispatch(move);
+        REQUIRE(ImGui::GetMouseCursor() == ImGuiMouseCursor_Hand);
+
+        child.style(StyleType::HOVER).cursor(ImGuiMouseCursor_ResizeAll);
+        move.position = {10.0F, 10.0F};
+        router.dispatch(move);
+        move.position = {30.0F, 10.0F};
+        router.dispatch(move);
+        REQUIRE(ImGui::GetMouseCursor() == ImGuiMouseCursor_ResizeAll);
+
         move.position = {100.0F, 100.0F};
+        router.dispatch(move);
+        REQUIRE(ImGui::GetMouseCursor() == ImGuiMouseCursor_Arrow);
+
+        move.position = {30.0F, 10.0F};
+        router.dispatch(move);
+        REQUIRE(ImGui::GetMouseCursor() == ImGuiMouseCursor_ResizeAll);
+        move.position = {150.0F, 100.0F};
         router.dispatch(move);
         REQUIRE(ImGui::GetMouseCursor() == ImGuiMouseCursor_Arrow);
     });

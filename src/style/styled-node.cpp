@@ -290,6 +290,8 @@ void StyledNode::set_open_style(bool open) {
 }
 
 void StyledNode::update_cursor() {
+    if (ImGui::GetCurrentContext() == nullptr) return;
+
     if (!enabled()) {
         const Rect rect = layout().visual_rect();
         if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows) || !ImGui::IsMouseHoveringRect(rect.min, rect.max)) {
@@ -299,8 +301,17 @@ void StyledNode::update_cursor() {
         return;
     }
 
-    const ImGuiMouseCursor cursor = style(style_type()).cursor();
-    if (cursor != ImGuiMouseCursor_None) ImGui::SetMouseCursor(cursor);
+    for (const Node* node = this; node != nullptr; node = node->parent()) {
+        const auto* styled = dynamic_cast<const StyledNode*>(node);
+        if (styled == nullptr) continue;
+
+        const ImGuiMouseCursor cursor = styled->style(styled->style_type()).cursor();
+        if (cursor != ImGuiMouseCursor_None) {
+            ImGui::SetMouseCursor(cursor);
+            return;
+        }
+    }
+    ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
 }
 
 StyledNode& StyledNode::set_tooltip(std::string text) {
