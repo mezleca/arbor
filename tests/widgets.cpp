@@ -22,6 +22,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <algorithm>
@@ -31,6 +32,163 @@
 #include <vector>
 
 using namespace ui;
+
+TEST_CASE("composed text fields keep accessories separate from editing", "[TextInputWidget][composition]") {
+    Runtime runtime;
+    auto surface = ui_test::make_surface(runtime);
+    auto& input = surface.root().add<TextInputWidget>(std::string("hello world"));
+    input.set_size({px(360.0f), fit()});
+    input.leading().add<TextWidget>("Search");
+    auto& clear = input.trailing().add<ButtonWidget>("Clear");
+    clear.on_click([&input] { input.set_value(""); });
+    int filtered = 0;
+    input.set_flags(ImGuiInputTextFlags_CallbackCharFilter | ImGuiInputTextFlags_CallbackResize);
+    input.set_callback(
+        [](ImGuiInputTextCallbackData* data) {
+            ++*static_cast<int*>(data->UserData);
+            return data->EventChar == 'x' ? 1 : 0;
+        },
+        &filtered
+    );
+    const auto context = ui_test::prepare_surface(surface, {500.0f, 250.0f});
+    input.focus();
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+    input.set_selection(6, 11);
+    ui_test::draw_surface(surface);
+    REQUIRE(input.selection().start == 6);
+    REQUIRE(input.replace_selection("team"));
+    ui_test::draw_surface(surface);
+    ImGui::GetIO().AddInputCharactersUTF8("x!");
+    ui_test::draw_surface(surface);
+    REQUIRE(input.value() == "hello team!");
+    REQUIRE(filtered == 2);
+    REQUIRE_FALSE(input.flags() & ImGuiInputTextFlags_CallbackResize);
+    const ImVec2 position = ui_test::center(clear.layout().visual_rect());
+    REQUIRE_FALSE(input.field().layout().visual_rect().contains(position));
+    auto down = ui_test::pointer_event(EventType::PointerDown, position);
+    auto up = ui_test::pointer_event(EventType::PointerUp, position);
+    surface.dispatch(down);
+    surface.dispatch(up);
+    REQUIRE(input.value().empty());
+    REQUIRE_FALSE(input.input_state().focused);
+}
+
+TEST_CASE("multiline inputs grow within their row limits and submit separately", "[TextInputWidget][multiline]") {
+    Runtime runtime;
+    auto surface = ui_test::make_surface(runtime);
+    auto& input = surface.root().add<TextInputWidget>();
+    input.set_multiline().set_rows(1, 3).set_submit_mode(TextSubmitMode::Enter).set_hint("Message");
+    input.leading().add<ButtonWidget>("Mention");
+    input.set_size({px(320.0f), fit()});
+    int submissions = 0;
+    input.on_submit([&] { ++submissions; });
+    const auto context = ui_test::prepare_surface(surface, {500.0f, 400.0f});
+    input.focus();
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+    const float initial_height = input.layout().size().y;
+    input.set_value("one\ntwo\nthree\nfour");
+    ui_test::draw_surface(surface);
+    REQUIRE(input.layout().size().y > initial_height);
+    const float maximum_height = input.layout().size().y;
+    input.set_value("one\ntwo\nthree\nfour\nfive");
+    ui_test::draw_surface(surface);
+    REQUIRE(input.layout().size().y == maximum_height);
+    auto& io = ImGui::GetIO();
+    io.AddKeyEvent(ImGuiMod_Shift, true);
+    io.AddKeyEvent(ImGuiKey_Enter, true);
+    ui_test::draw_surface(surface);
+    REQUIRE(input.value().ends_with('\n'));
+    REQUIRE(submissions == 0);
+    io.AddKeyEvent(ImGuiKey_Enter, false);
+    io.AddKeyEvent(ImGuiMod_Shift, false);
+    ui_test::draw_surface(surface);
+    io.AddKeyEvent(ImGuiKey_Enter, true);
+    ui_test::draw_surface(surface);
+    REQUIRE(submissions == 1);
+}
+
+TEST_CASE("dropdown search fields survive filtering in the header and trigger", "[DropdownWidget][composition]") {
+    Runtime runtime;
+    auto surface = ui_test::make_surface(runtime);
+    auto& dropdown = surface.root().add<DropdownWidget>();
+    dropdown.set_size({px(300.0f), fit()});
+    int selections = 0;
+    dropdown.on_select([&] { ++selections; });
+    const bool trigger = GENERATE(false, true);
+    Container& host = trigger ? dropdown.trigger() : dropdown.header();
+    auto& search = host.add<TextInputWidget>();
+    search.on_change([&] {
+        dropdown.set_options({{search.value(), "yes"}, {"Unavailable", "no", false}});
+        dropdown.open();
+    });
+    auto& footer = dropdown.footer().add<TextWidget>("Footer");
+    dropdown.set_options({{"Unavailable", "no", false}});
+    dropdown.set_options({{"Available", "yes"}, {"Unavailable", "no", false}});
+    const auto context = ui_test::prepare_surface(surface, {500.0f, 300.0f});
+    if (!trigger) dropdown.open();
+    search.focus();
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+    REQUIRE(search.parent() == &host);
+    REQUIRE(footer.parent() == &dropdown.footer());
+    auto down = ui_test::pointer_event(EventType::PointerDown, ui_test::center(search.frame().layout().visual_rect()));
+    surface.dispatch(down);
+    REQUIRE_FALSE(down.native_input_blocked);
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+    ImGui::GetIO().AddInputCharactersUTF8("a");
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+    REQUIRE(dropdown.is_open());
+    ImGui::GetIO().AddInputCharactersUTF8("b");
+    ui_test::draw_surface(surface);
+    REQUIRE(search.value() == "ab");
+    REQUIRE_FALSE(dropdown.select_value("no"));
+    REQUIRE(dropdown.is_open());
+    REQUIRE(dropdown.select_value("yes"));
+    dropdown.open();
+    REQUIRE_FALSE(dropdown.select_value("yes"));
+    REQUIRE_FALSE(dropdown.is_open());
+    REQUIRE(selections == 2);
+}
+
+TEST_CASE("number input bounds preserve 64 bit integers", "[NumberInputWidget][range]") {
+    constexpr std::uint64_t minimum = (std::uint64_t{1} << 53) + 1;
+    NumberInputWidget<std::uint64_t> input;
+    input.set_range(minimum + 4, minimum);
+    REQUIRE(input.minimum() == minimum);
+    REQUIRE(input.maximum() == minimum + 4);
+}
+
+TEST_CASE("color picker synchronizes hexadecimal without quantizing programmatic colors", "[ColorPickerWidget][composition]") {
+    ColorPickerWidget picker;
+    const Color color = rgb(0.1234f, 0.5678f, 0.9012f);
+    REQUIRE(picker.set_color(color));
+    auto* hex = static_cast<TextInputWidget*>(picker.popup().find("hex"));
+    REQUIRE(hex != nullptr);
+    REQUIRE(hex->value().size() == 9);
+    picker.set_alpha_visible(false);
+    REQUIRE(hex->value().size() == 7);
+    REQUIRE(picker.color() == color);
+}
+
+TEST_CASE("available text wrapping follows parent resizing", "[TextWidget][composition]") {
+    Runtime runtime;
+    auto surface = ui_test::make_surface(runtime);
+    auto& parent = surface.root().add<Container>("parent");
+    parent.set_size({px(140.0f), fit()});
+    auto& text = parent.add<TextWidget>("A responsive description that wraps to the available width.");
+    text.set_size({grow(), fit()});
+    text.set_wrap_available();
+    const auto context = ui_test::prepare_surface(surface, {600.0f, 300.0f});
+    ui_test::draw_surface(surface);
+    const float narrow = text.layout().size().y;
+    parent.set_size({px(450.0f), fit()});
+    ui_test::draw_surface(surface);
+    REQUIRE(text.layout().size().y < narrow);
+}
 
 TEST_CASE("checkbox input is limited to its box", "[CheckboxWidget][input][regression]") {
     Runtime runtime;
@@ -285,7 +443,7 @@ TEST_CASE("dropdown opens from a nested container without extending its parent",
     ui_test::draw_surface(surface);
     REQUIRE(dropdown.is_open());
     const Rect body_rect = dropdown.body().layout().visual_rect();
-    for (const auto& child : dropdown.body().children()) {
+    for (const auto& child : dropdown.option_list().children()) {
         UiEvent move = ui_test::pointer_event(EventType::PointerMove, ui_test::center(child->layout().visual_rect()));
         surface.dispatch(move);
         REQUIRE(child->input_state().hovered);
@@ -1329,17 +1487,17 @@ TEST_CASE("dropdown option replacements retain only the current live rows", "[Dr
     );
     dropdown.set_size({px(180.0F), px(32.0F)});
     dropdown.on_change([&changes] { ++changes; });
-    const uint64_t first_identity = dropdown.body().children().front()->identity();
+    const uint64_t first_identity = dropdown.option_list().children().front()->identity();
     std::vector<DropdownOption> options{{"new first", "new-first"}, {"new second", "new-second"}};
 
     SECTION("same count retains row identities") {
         dropdown.set_options(options);
-        REQUIRE(dropdown.body().children().front()->identity() == first_identity);
+        REQUIRE(dropdown.option_list().children().front()->identity() == first_identity);
     }
     SECTION("different count replaces rows without immediate destruction") {
         options.push_back({"third", "third"});
         dropdown.set_options(options);
-        REQUIRE(dropdown.body().children().front()->removal_pending());
+        REQUIRE(dropdown.option_list().children().front()->removal_pending());
     }
     SECTION("consecutive growth does not count pending rows") {
         dropdown.set_options({{"a", "a"}, {"b", "b"}, {"c", "c"}});
@@ -1354,10 +1512,10 @@ TEST_CASE("dropdown option replacements retain only the current live rows", "[Dr
     SECTION("same-count replacement after a rebuild retains live identities") {
         options.push_back({"third", "third"});
         dropdown.set_options(options);
-        const uint64_t live_identity = dropdown.body().children().back()->identity();
+        const uint64_t live_identity = dropdown.option_list().children().back()->identity();
         options.back() = {"changed third", "changed-third"};
         dropdown.set_options(options);
-        REQUIRE(dropdown.body().children().back()->identity() == live_identity);
+        REQUIRE(dropdown.option_list().children().back()->identity() == live_identity);
     }
     SECTION("empty replacement can be repopulated before the next frame") {
         dropdown.set_options({});
@@ -1365,7 +1523,7 @@ TEST_CASE("dropdown option replacements retain only the current live rows", "[Dr
     }
 
     std::vector<Node*> rows;
-    for (const auto& child : dropdown.body().children()) {
+    for (const auto& child : dropdown.option_list().children()) {
         if (!child->removal_pending()) rows.push_back(child.get());
     }
     REQUIRE(rows.size() == options.size());
@@ -1377,7 +1535,7 @@ TEST_CASE("dropdown option replacements retain only the current live rows", "[Dr
     dropdown.open();
     ui_test::draw_surface(surface, 0.2F);
     REQUIRE(dropdown.is_open());
-    REQUIRE(dropdown.body().children().size() == options.size());
+    REQUIRE(dropdown.option_list().children().size() == options.size());
     const ImVec2 position = ui_test::center(rows.back()->layout().visual_rect());
     REQUIRE(surface.input_router().node_at(position) == rows.back());
     auto down = ui_test::pointer_event(EventType::PointerDown, position);
@@ -1407,7 +1565,7 @@ TEST_CASE("dropdown closing body blocks underlying input without selecting rows"
     dropdown.open();
     ui_test::draw_surface(surface, 0.2F);
     REQUIRE(dropdown.is_open());
-    const ImVec2 position = ui_test::center(dropdown.body().children().back()->layout().visual_rect());
+    const ImVec2 position = ui_test::center(dropdown.option_list().children().back()->layout().visual_rect());
 
     dropdown.close();
     dropdown.open();
@@ -1416,7 +1574,7 @@ TEST_CASE("dropdown closing body blocks underlying input without selecting rows"
     ui_test::draw_surface(surface, 0.01F);
     REQUIRE(dropdown.body().visually_visible());
     REQUIRE(dropdown.body().input_enabled());
-    REQUIRE_FALSE(dropdown.body().children().back()->accepts_input());
+    REQUIRE_FALSE(dropdown.option_list().children().back()->accepts_input());
     surface.input_router().register_target(underlying, dropdown.body().layout().visual_rect());
     REQUIRE(surface.input_router().node_at(position) == &dropdown.body());
     auto down = ui_test::pointer_event(EventType::PointerDown, position);
@@ -1434,7 +1592,7 @@ TEST_CASE("dropdown closing body blocks underlying input without selecting rows"
     dropdown.open();
     ui_test::draw_surface(surface, 0.2F);
     REQUIRE(dropdown.is_open());
-    REQUIRE(dropdown.body().children().back()->accepts_input());
+    REQUIRE(dropdown.option_list().children().back()->accepts_input());
 }
 
 TEST_CASE("dropdown observes an externally closed native popup before reopening", "[DropdownWidget][popup][regression]") {
@@ -1452,7 +1610,7 @@ TEST_CASE("dropdown observes an externally closed native popup before reopening"
     REQUIRE(dropdown.is_open());
 
     bool closed_native = false;
-    auto& row = static_cast<StyledNode&>(*dropdown.body().children().front());
+    auto& row = static_cast<StyledNode&>(*dropdown.option_list().children().front());
     row.before().set_draw_callback([&closed_native](const PaintContext&) {
         if (!closed_native) {
             ImGui::CloseCurrentPopup();
@@ -1471,7 +1629,7 @@ TEST_CASE("dropdown observes an externally closed native popup before reopening"
     dropdown.open();
     ui_test::draw_surface(surface, 0.2F);
     REQUIRE(dropdown.is_open());
-    const auto& option = dropdown.body().children().back();
+    const auto& option = dropdown.option_list().children().back();
     const ImVec2 position = ui_test::center(option->layout().visual_rect());
     REQUIRE(surface.input_router().node_at(position) == option.get());
     auto down = ui_test::pointer_event(EventType::PointerDown, position);

@@ -52,6 +52,18 @@ void ButtonWidget::click_event(UiEvent&) {
     }
 }
 
+void ButtonWidget::mouse_press_event(UiEvent& event) {
+    if (event.target == this && event.button == PointerButton::Left) surface().input_router().set_focus(this);
+}
+
+void ButtonWidget::key_press_event(UiEvent& event) {
+    if (event.target == this && input_state().focused && (event.key == Key::Enter || event.key == Key::Space)) {
+        event.stop_propagation();
+        event.block_native_input();
+        click_event(event);
+    }
+}
+
 void ButtonWidget::on_measure() {
     m_text.set_font(font(), font_size());
     m_text.set_line_height(computed_style().line_height());

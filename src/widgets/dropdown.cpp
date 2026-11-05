@@ -34,6 +34,7 @@ public:
         : ButtonWidget(owner.m_options[index].label, {grow(), fit()}), m_owner(owner), m_index(index) {
         set_type_name("DropdownOption");
         set_text_alignment({0.0F, 0.5F});
+        refresh();
 
         // each live option keeps its source index. count changes replace rows through deferred node removal.
         on_click([this] {
@@ -41,6 +42,13 @@ public:
                 m_owner.select_value(m_owner.m_options[m_index].value);
             }
         });
+    }
+
+    void refresh() {
+        const auto& option = m_owner.m_options[m_index];
+        set_text(option.label);
+        set_enabled(option.enabled);
+        set_tooltip(option.description);
     }
 
     bool accepts_input() const override {
@@ -83,6 +91,10 @@ private:
     }
 
     void on_measure() override {
+        if (!children().empty()) {
+            Container::on_measure();
+            return;
+        }
         const std::string_view text = preview();
         const ImVec2 text_size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
         set_measured_content_size(
@@ -92,7 +104,7 @@ private:
     }
 
     void click_event(UiEvent& event) override {
-        if (event.button != PointerButton::Left) {
+        if (event.button != PointerButton::Left || event.target != this) {
             return;
         }
 
@@ -104,6 +116,7 @@ private:
     }
 
     void paint_content(const PaintContext& context) override {
+        if (!children().empty()) return;
         const ComputedStyle& current_style = context.style;
         const std::string_view text = preview();
         const ImVec2 text_size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
@@ -134,6 +147,15 @@ DropdownBody::DropdownBody(DropdownWidget& owner) : LayerContainer("body", Layer
     set_layout({.size = {px(0.0F), fit()}, .in_flow = false});
     set_spacing(0.0F);
     fade_out();
+    m_owner.m_header = &add<Container>("header");
+    m_owner.m_option_list = &add<Container>("options");
+    m_owner.m_footer = &add<Container>("footer");
+    for (Container* part : {m_owner.m_header, m_owner.m_option_list, m_owner.m_footer}) {
+        part->set_input_mode(InputMode::None);
+        part->set_size({grow(), fit()});
+    }
+    m_owner.m_header->set_visible(false);
+    m_owner.m_footer->set_visible(false);
     rebuild_options();
 }
 
@@ -154,20 +176,19 @@ void DropdownBody::apply_theme_defaults(const Theme& theme) {
 }
 
 void DropdownBody::rebuild_options() {
-    const auto live_count = std::ranges::count(children(), false, &Node::removal_pending);
+    const auto live_count = std::ranges::count(m_owner.m_option_list->children(), false, &Node::removal_pending);
     if (static_cast<std::size_t>(live_count) == m_owner.m_options.size()) {
-        std::size_t index = 0;
-        for (const auto& child : children()) {
+        for (const auto& child : m_owner.m_option_list->children()) {
             if (child->removal_pending()) continue;
 
-            static_cast<DropdownOptionNode&>(*child).set_text(m_owner.m_options[index++].label);
+            static_cast<DropdownOptionNode&>(*child).refresh();
         }
         return;
     }
 
-    clear();
+    m_owner.m_option_list->clear();
     for (std::size_t index = 0; index < m_owner.m_options.size(); ++index) {
-        add<DropdownOptionNode>(m_owner, index);
+        m_owner.m_option_list->add<DropdownOptionNode>(m_owner, index);
     }
 }
 
@@ -192,7 +213,7 @@ bool DropdownBody::paint() {
 
 void DropdownBody::draw_children() {
     std::size_t index = 0;
-    for (const auto& child : children()) {
+    for (const auto& child : m_owner.m_option_list->children()) {
         if (child->removal_pending()) continue;
 
         auto& option = static_cast<DropdownOptionNode&>(*child);
@@ -244,6 +265,8 @@ void DropdownWidget::close() {
     }
 
     m_visibility = DropdownVisibility::Closing;
+    auto& router = surface().input_router();
+    if (m_body->contains(router.focused_node())) router.set_focus(m_trigger);
     m_trigger->set_open_style(false);
 
     // keep the body registered while it fades out. closing rows cannot be selected.
@@ -273,7 +296,29 @@ DropdownWidget::DropdownWidget(
 }
 
 void DropdownWidget::event(UiEvent& event) {
-    if (event.type == EventType::PointerDown || event.type == EventType::PointerUp) {
+    if (event.type == EventType::KeyDown) {
+        if (event.key == Key::Escape && is_open()) {
+            close();
+        } else if (
+            (event.target == m_trigger || m_option_list->contains(event.target)) &&
+            (event.key == Key::Down || event.key == Key::Up)
+        ) {
+            if (!is_open()) open();
+            navigate(event.key == Key::Down ? 1 : -1);
+        } else if (event.target == m_trigger && event.key == Key::Enter) {
+            open();
+            navigate(1);
+        } else {
+            return;
+        }
+        event.stop_propagation();
+        event.block_native_input();
+    }
+    if (event.type == EventType::PointerDown && event.target == m_trigger) {
+        surface().input_router().set_focus(m_trigger);
+    }
+    if ((event.type == EventType::PointerDown || event.type == EventType::PointerUp) &&
+        (event.target == this || event.target == m_trigger || m_option_list->contains(event.target))) {
         event.block_native_input();
     }
 }
@@ -322,15 +367,23 @@ void DropdownWidget::update_label_layout() {
 
 bool DropdownWidget::select_value(std::string_view value) {
     const DropdownOption* option = find_option(value);
-    if (option == nullptr || m_value.value() == option->value) {
+    if (option == nullptr || !option->enabled) {
         return false;
     }
 
     close();
-    m_value.set(option->value);
-    invalidate_measure();
-    notify_change();
-    return true;
+    const bool changed = m_value.set(option->value);
+    if (changed) {
+        invalidate_measure();
+        notify_change();
+    }
+    if (!removal_pending() && m_on_select) m_on_select();
+    return changed;
+}
+
+DropdownWidget& DropdownWidget::on_select(std::function<void()> callback) {
+    m_on_select = std::move(callback);
+    return *this;
 }
 
 DropdownWidget& DropdownWidget::set_placeholder(std::string placeholder) {
@@ -354,10 +407,55 @@ DropdownWidget& DropdownWidget::set_options(std::vector<DropdownOption> options)
     return *this;
 }
 
-Widget& DropdownWidget::trigger() const {
+Widget& DropdownWidget::trigger() {
     return *m_trigger;
 }
 
-Container& DropdownWidget::body() const {
+Container& DropdownWidget::body() {
     return *m_body;
+}
+
+const Widget& DropdownWidget::trigger() const {
+    return *m_trigger;
+}
+
+const Container& DropdownWidget::body() const {
+    return *m_body;
+}
+
+Container& DropdownWidget::header() {
+    m_header->set_visible(true);
+    return *m_header;
+}
+
+Container& DropdownWidget::footer() {
+    m_footer->set_visible(true);
+    return *m_footer;
+}
+
+Container& DropdownWidget::option_list() {
+    return *m_option_list;
+}
+
+const Container& DropdownWidget::option_list() const {
+    return *m_option_list;
+}
+
+void DropdownWidget::navigate(int direction) {
+    const auto& rows = option_list().children();
+    const int count = static_cast<int>(rows.size());
+    int current = direction > 0 ? -1 : count;
+    for (int index = 0; index < count; ++index) {
+        if (rows[index]->input_state().focused) current = index;
+    }
+    for (int step = 0; step < count; ++step) {
+        current = (current + direction + count) % count;
+        if (rows[current]->accepts_input() && surface().input_router().set_focus(rows[current].get())) return;
+    }
+}
+
+void DropdownWidget::on_update(float) {
+    if (m_display_value == m_value.value()) return;
+    m_display_value = m_value.value();
+    invalidate_measure();
 }

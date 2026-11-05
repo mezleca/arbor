@@ -42,10 +42,13 @@ static constexpr std::string_view DEMO_INLINE_ICON_SVG = R"(
         <path d="M12 8V12L15 14" stroke="white" stroke-width="2" stroke-linecap="round"/>
     </svg>)";
 
+static constexpr double MIB = 1024.0 * 1024.0;
+
 enum class DemoPanelTone {
     Base,
     Secondary,
     Tertiary,
+    ACCENT
 };
 
 struct DemoChromaticCommand {
@@ -188,6 +191,7 @@ protected:
         const Color* background = &theme.background_color;
         if (m_tone == DemoPanelTone::Secondary) background = &theme.background_secondary_color;
         if (m_tone == DemoPanelTone::Tertiary) background = &theme.background_tertiary_color;
+        if (m_tone == DemoPanelTone::ACCENT) background = &theme.accent_color;
 
         configure_all_styles([&](Style& style) {
             style.padding(BoxInsets{m_padding.x, m_padding.y})
@@ -561,7 +565,7 @@ public:
     Container& add_page(std::string label) {
         auto& page = add<Container>(std::move(label));
         page.set_size({grow(), grow()});
-        page.set_spacing(4.0F);
+        page.set_spacing(2.0f);
         page.configure_all_styles([](Style& style) { style.padding({16.0F, 12.0F}); });
         page.set_scrollable(true);
         return page;
@@ -580,8 +584,10 @@ private:
             page->set_visible(selected);
             if (!selected) continue;
 
+            ImGui::PopStyleVar();
             arrange_child(*page, page->resolve_size(ImGui::GetContentRegionAvail()));
             page->draw_at_cursor();
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{18.0f, 10.0f});
             ImGui::EndTabItem();
         }
 
@@ -590,11 +596,11 @@ private:
     }
 };
 
-static void setup_size_limits(Container& layouts);
-static void setup_anchors(Container& layouts);
-static void setup_grow_weights(Surface& ui, Container& layouts);
-static void setup_virtual_list(Container& layouts);
-static void setup_effects(Surface& ui, Container& styles);
+void setup_size_limits(Container& layouts);
+void setup_anchors(Container& layouts);
+void setup_grow_weights(Surface& ui, Container& layouts);
+void setup_virtual_list(Container& layouts);
+void setup_effects(Surface& ui, Container& styles);
 
 class DemoScreen final : public Container {
 public:
@@ -604,11 +610,13 @@ public:
 
 private:
     void setup_overview(Container& page, std::string_view backend);
+    void setup_textures(Container& page);
     void setup_buttons(Container& widgets);
     void setup_numbers(Container& widgets);
     void setup_inputs(Container& widgets);
+    void setup_composed(Container& widgets);
     void setup_images(Container& widgets);
-    static void setup_text(Container& widgets);
+    void setup_text(Container& widgets);
     void setup_stack(Container& layouts);
     void setup_dynamic_nodes(Node& parent);
     void setup_appearance(Container& styles);
@@ -632,6 +640,8 @@ private:
     TextWidget* m_dynamic_status = nullptr;
     TextWidget* m_fps = nullptr;
     TextWidget* m_texture_status = nullptr;
+    Container* m_texture_list = nullptr;
+    std::vector<TextWidget*> m_texture_cards;
     float m_status_update_elapsed = 0.0F;
     Container* m_test_images = nullptr;
     bool m_enabled = true;
@@ -660,22 +670,26 @@ DemoScreen::DemoScreen() : Container("demo", StackDirection::Vertical) {
     // - grow() fills the available space. along a stack's direction, growing siblings share what remains after
     //   other children and gaps. grow(2) receives twice the share of grow(1). across the stack, grow fills that axis.
     set_size({grow(), grow()});
-    set_spacing(16.0F);
+    set_spacing(4.0F);
 }
 
 Container& DemoScreen::setup(std::string_view backend) {
     setup_overview(*this, backend);
+
     auto& tabs = add<DemoTabs>();
     auto& widgets = tabs.add_page("Widgets");
+    auto& textures = tabs.add_page("Texture");
     auto& layouts = tabs.add_page("Layout");
     auto& styles = tabs.add_page("Style & effects");
     auto& windows = tabs.add_page("Windows & input");
 
+    setup_composed(widgets);
     setup_buttons(widgets);
     setup_numbers(widgets);
     setup_inputs(widgets);
     setup_images(widgets);
     setup_text(widgets);
+    setup_textures(textures);
 
     setup_size_limits(layouts);
     setup_anchors(layouts);
@@ -704,12 +718,18 @@ void DemoScreen::setup_overview(Container& page, std::string_view backend) {
     summary.add<TextWidget>(std::format("imgui-ui / {}", backend));
     m_fps = &summary.add<TextWidget>("fps: 0.0");
     summary.add<TextWidget>("debugger: shift + d");
+}
 
-    auto& textures = overview.add<Container>("texture-registry");
-    textures.set_size({grow(), fit()});
-    textures.set_spacing(8.0F);
-    textures.add<TextWidget>("texture registry");
-    m_texture_status = &textures.add<TextWidget>("");
+void DemoScreen::setup_textures(Container& page) {
+    auto& registry = page.add<DemoPanel>("texture-registry");
+    registry.set_size({grow(), fit()});
+    registry.set_spacing(8.0f);
+    registry.add<TextWidget>("Texture registry");
+    m_texture_status = &registry.add<TextWidget>("");
+    m_texture_list = &registry.add<Container>("texture-list", StackDirection::Horizontal);
+    m_texture_list->set_size({grow(), fit()});
+    m_texture_list->set_wrap(StackWrap::Wrap);
+    m_texture_list->set_spacing(6.0f);
 }
 
 void DemoScreen::setup_buttons(Container& widgets) {
@@ -790,7 +810,7 @@ void DemoScreen::setup_numbers(Container& widgets) {
     unbounded.set_tooltip("drag horizontally to change the value at 0.01 steps");
 }
 
-static void setup_size_limits(Container& layouts) {
+void setup_size_limits(Container& layouts) {
     auto& size_limits = layouts.add<TreeContainer>("Size limits & grow distribution");
     size_limits.set_size({grow(), fit()});
     size_limits.set_spacing(8.0F);
@@ -851,6 +871,116 @@ void DemoScreen::setup_inputs(Container& widgets) {
     color.set_tooltip("opens the color picker popup");
 }
 
+void DemoScreen::setup_composed(Container& widgets) {
+    auto& composed = widgets.add<TreeContainer>("Composed widgets");
+    composed.set_spacing(10.0f);
+
+    auto& search_panel = composed.add<DemoPanel>("search-box", DemoPanelTone::Base, ImVec2{8.0f, 8.0f});
+    auto& notes_panel = composed.add<DemoPanel>("textarea", DemoPanelTone::Base, ImVec2{8.0f, 8.0f});
+    auto& composer_panel = composed.add<DemoPanel>("composer", DemoPanelTone::Base, ImVec2{8.0f, 8.0f});
+    auto& selector_panel = composed.add<DemoPanel>("searchable-selector", DemoPanelTone::Base, ImVec2{8.0f, 8.0f});
+
+    for (DemoPanel* panel : {&search_panel, &notes_panel, &composer_panel, &selector_panel}) {
+        panel->set_size({grow(), fit()});
+        panel->set_spacing(6.0f);
+    }
+
+    auto& search = search_panel.add<TextInputWidget>();
+    search.set_label("Search box", LabelPlacement::Above).set_hint("Filter channels...");
+    search.leading().add<TextWidget>("Search");
+
+    auto& clear = search.trailing().add<ButtonWidget>("Clear");
+    clear.on_click([&search] {
+        search.set_value("");
+        search.focus();
+    });
+
+    auto& results = search_panel.add<Container>("results");
+    results.set_size({grow(), fit()});
+    const std::array<TextWidget*, 3> channels = {
+        &results.add<TextWidget>("# general"), &results.add<TextWidget>("# development"), &results.add<TextWidget>("# design")
+    };
+
+    search.on_change([&search, channels] {
+        for (TextWidget* channel : channels) {
+            channel->set_visible(channel->text().find(search.value()) != std::string::npos);
+        }
+    });
+
+    auto& textarea = notes_panel.add<TextInputWidget>();
+    textarea.set_label("Textarea", LabelPlacement::Above);
+    textarea.set_multiline().set_rows(3, 6).set_hint("Write a note, Enter starts a new line...");
+    textarea.set_flags(ImGuiInputTextFlags_WordWrap);
+
+    auto& count = notes_panel.add<TextWidget>("0 bytes");
+    textarea.on_change([&textarea, &count] { count.set_text(std::format("{} bytes", textarea.value().size())); });
+
+    auto& composer = composer_panel.add<TextInputWidget>();
+    composer.set_label("Message composer", LabelPlacement::Above);
+    composer.set_multiline().set_rows(1, 4).set_submit_mode(TextSubmitMode::Enter).set_hint("Message #general");
+    composer.set_flags(ImGuiInputTextFlags_WordWrap);
+
+    composer_panel.add<TextWidget>("Enter sends, Shift+Enter adds a line. Insert a mention at the selection.");
+    auto& sent = composer_panel.add<TextWidget>("No messages sent");
+    sent.set_size({grow(), fit()});
+    sent.set_wrap_available();
+
+    composer.leading().add<ButtonWidget>("@team").on_click([&composer] {
+        composer.replace_selection("@team ");
+        composer.focus();
+    });
+
+    const auto send = [&composer, &sent] {
+        if (composer.value().empty()) return;
+        sent.set_text("Last message: " + composer.value());
+        composer.set_value("");
+        composer.focus();
+    };
+
+    composer.on_submit(send);
+    composer.trailing().add<ButtonWidget>("Send").on_click(send);
+
+    static const std::vector<DropdownOption> options = {
+        {"Online", "online"}, {"Away", "away"}, {"Do not disturb", "busy"}, {"Offline (unavailable)", "offline", false}
+    };
+
+    auto& status = selector_panel.add<DropdownWidget>(std::string("online"), options, "Searchable selector");
+    status.set_size({px(300.0f), fit()});
+    status.trigger().configure_all_styles([](Style& style) {
+        style.padding({}).border(BorderEdge{0.0f, BorderType::None}).background_color(rgba(0, 0, 0, 0));
+    });
+
+    // replace the trigger default preview while the native field stays focused while options change
+    auto& filter = status.trigger().add<TextInputWidget>();
+    filter.set_hint("Find a status...").set_flags(ImGuiInputTextFlags_AutoSelectAll);
+    filter.set_value("Online");
+    filter.trailing().add<TextWidget>("v");
+    filter.on_change([&status, &filter] {
+        if (!filter.input_state().focused) {
+            return;
+        }
+
+        std::vector<DropdownOption> matches;
+        for (const auto& option : options) {
+            if (option.label.find(filter.value()) != std::string::npos) {
+                matches.push_back(option);
+            }
+        }
+        status.set_options(std::move(matches));
+        status.open();
+    });
+
+    filter.on_event(EventType::Click, [&status](UiEvent&) {
+        status.set_options(options);
+        status.open();
+    });
+
+    status.on_select([&status, &filter] {
+        const auto selected = std::ranges::find(status.options(), status.value(), &DropdownOption::value);
+        filter.set_value(selected->label);
+    });
+}
+
 void DemoScreen::setup_images(Container& widgets) {
     Surface& ui = surface();
     // static and animated textures share this horizontal viewport. new images use the currently selected fit mode.
@@ -900,7 +1030,7 @@ void DemoScreen::setup_text(Container& widgets) {
         .set_size({px(220.0F), px(40.0F)});
 }
 
-static void setup_anchors(Container& layouts) {
+void setup_anchors(Container& layouts) {
     // matching anchor and origin align each button with the same point in the preview. the inline layer stays inside it.
     auto& placement = layouts.add<TreeContainer>("Anchors & inline layers");
     placement.set_spacing(8.0F);
@@ -920,7 +1050,7 @@ static void setup_anchors(Container& layouts) {
     inline_layer.add<TextWidget>("inline overlay");
 }
 
-static void setup_grow_weights(Surface& ui, Container& layouts) {
+void setup_grow_weights(Surface& ui, Container& layouts) {
     // weighted growth divides space after gaps. the boxes below compare the same size request with different box sizing.
     auto& weights = layouts.add<TreeContainer>("Grow weights & box sizing");
     weights.set_spacing(8.0F);
@@ -983,7 +1113,7 @@ void DemoScreen::setup_appearance(Container& styles) {
     });
 }
 
-static void setup_effects(Surface& ui, Container& styles) {
+void setup_effects(Surface& ui, Container& styles) {
     // the custom pass captures its panel after its children draw. the other panels paint linear and radial gradients.
     auto& effects = styles.add<TreeContainer>("Gradients & custom shader");
     effects.set_spacing(12.0F);
@@ -1015,7 +1145,7 @@ void DemoScreen::setup_stack(Container& layouts) {
     });
 }
 
-static void setup_virtual_list(Container& layouts) {
+void setup_virtual_list(Container& layouts) {
     auto& virtual_section = layouts.add<TreeContainer>("Virtual list: 100000 rows");
     virtual_section.set_size({grow(), fit()});
     virtual_section.set_spacing(8.0F);
@@ -1201,20 +1331,46 @@ int& DemoScreen::blur() {
 
 void DemoScreen::on_update(float dt) {
     m_status_update_elapsed += std::max(0.0F, dt);
+
     if (m_status_update_elapsed >= 0.25F) {
+        const auto textures = surface().runtime().textures().stats(surface().imgui_context());
+
         m_status_update_elapsed = 0.0F;
         m_fps->set_text(std::format("fps: {:.1f}", ImGui::GetIO().Framerate));
-        const auto textures = surface().runtime().textures().stats(surface().imgui_context());
-        constexpr double mib = 1024.0 * 1024.0;
         m_texture_status->set_text(
             std::format(
-                "textures: {} | with active handles: {}\n"
-                "estimated CPU (global): {:.2f} MiB\n"
-                "estimated GPU (this context): {:.2f} MiB",
-                textures.entry_count, textures.referenced_count, static_cast<double>(textures.cpu_bytes) / mib,
-                static_cast<double>(textures.gpu_bytes) / mib
+                "{} textures | CPU: {:.2f} MiB | GPU: {:.2f} MiB", textures.entry_count,
+                static_cast<double>(textures.cpu_bytes) / MIB, static_cast<double>(textures.gpu_bytes) / MIB
             )
         );
+
+        auto entries = surface().runtime().textures().entries(surface().imgui_context());
+        std::ranges::sort(entries, {}, &TextureEntryInfo::id);
+        while (m_texture_cards.size() > entries.size()) {
+            m_texture_list->remove(*m_texture_cards.back()->parent());
+            m_texture_cards.pop_back();
+        }
+
+        for (std::size_t index = 0; index < entries.size(); ++index) {
+            const auto& entry = entries[index];
+
+            if (index == m_texture_cards.size()) {
+                auto& card = m_texture_list->add<DemoPanel>("texture", DemoPanelTone::ACCENT, ImVec2{8.0f, 8.0f});
+                card.set_size({px(240.0f), px(200.0f)});
+
+                auto& text = card.add<TextWidget>("");
+                text.set_size({grow(), fit()});
+                text.set_wrap_available();
+                m_texture_cards.push_back(&text);
+            }
+
+            m_texture_cards[index]->set_text(
+                std::format(
+                    "{}\n{:.0f} x {:.0f}\nCPU {:.1f} KiB | GPU {:.1f} KiB", entry.id, entry.size.x, entry.size.y,
+                    static_cast<double>(entry.memory.cpu_bytes) / 1024.0, static_cast<double>(entry.memory.gpu_bytes) / 1024.0
+                )
+            );
+        }
     }
 }
 
@@ -1228,7 +1384,7 @@ static void apply_border_style(Node& node, BorderType style) {
     }
 }
 
-static DemoFloatingWindow& setup_floating_window(Container& windows) {
+DemoFloatingWindow& setup_floating_window(Container& windows) {
     // this window is submitted only while its section is expanded. the toggle keeps it closed on startup.
     auto& floating_section = windows.add<TreeContainer>("Movable window");
     auto& floating = floating_section.add<DemoFloatingWindow>();
@@ -1239,7 +1395,7 @@ static DemoFloatingWindow& setup_floating_window(Container& windows) {
     return floating;
 }
 
-static void setup_context_menu(Surface& surface, Container& windows) {
+void setup_context_menu(Surface& surface, Container& windows) {
     // the popup belongs to the surface root so page scrolling does not clip its submenu.
     Texture* inline_icon = surface.runtime().textures().find("demo-inline-icon");
     auto& context_section = windows.add<TreeContainer>("Context menus & submenus");
@@ -1265,7 +1421,7 @@ static void setup_context_menu(Surface& surface, Container& windows) {
     context_button.on_click([&context_menu] { context_menu.open(); });
 }
 
-static void setup_pointer_blocker(Surface& surface, Container& windows) {
+void setup_pointer_blocker(Surface& surface, Container& windows) {
     // the full-size layer is the input barrier, while its child is only the visible centered panel.
     // InputMode::Blocker excludes unrelated branches behind the layer from pointer events, including native scrollbar
     // interaction. descendants remain eligible, so the panel's close button works. clicking outside the panel still hits the
@@ -1293,7 +1449,7 @@ static void setup_pointer_blocker(Surface& surface, Container& windows) {
     });
 }
 
-static void setup_modal(DemoScreen& demo, Surface& surface, Container& windows) {
+void setup_modal(DemoScreen& demo, Surface& surface, Container& windows) {
     // apply blur to the full-size backdrop rather than to the modal panel. it samples content drawn earlier behind the layer.
     // the panel is drawn as a descendant over that blurred background. Blocker makes the entire backdrop reject input to the
     // demo, including the transparent area outside the panel, so transparency does not make the modal pass input through.

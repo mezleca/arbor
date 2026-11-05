@@ -151,8 +151,13 @@ void CheckboxWidget::on_update(float) {
     m_fill_node->set_visible(m_value.value());
 }
 
-Rect CheckboxWidget::hit_rect(Rect) const {
-    return m_frame_node->layout().visual_rect();
+Rect CheckboxWidget::hit_rect(Rect visual_rect) const {
+    return m_label_clickable ? visual_rect : m_frame_node->layout().visual_rect();
+}
+
+CheckboxWidget& CheckboxWidget::set_label_clickable(bool clickable) {
+    m_label_clickable = clickable;
+    return *this;
 }
 
 void CheckboxWidget::update_shape() {

@@ -17,9 +17,16 @@ namespace ui {
         explicit TextWidget(std::string text);
 
         TextWidget& set_wrap(float width);
+        TextWidget& set_wrap_available(bool wrap = true);
+        TextWidget& set_alignment(ImVec2 alignment);
         TextWidget& set_overflow(TextOverflow overflow);
+        const std::string& text() const {
+            return m_text.str();
+        }
+
         bool empty() const;
         TextWidget& set_text(std::string text);
+        ImVec2 measure_size(ImVec2 allocation) const override;
 
     protected:
         void apply_theme_defaults(const Theme& theme) override;
@@ -28,8 +35,10 @@ namespace ui {
         bool paint() override;
         void on_measure() override;
 
-        TextValue m_text;
+        mutable TextValue m_text;
         TextOverflow m_overflow = TextOverflow::Clip;
+        ImVec2 m_alignment{};
+        bool m_wrap_available = false;
     };
 
 } // namespace ui

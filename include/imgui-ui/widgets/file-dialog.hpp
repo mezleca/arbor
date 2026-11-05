@@ -20,6 +20,23 @@ namespace ui {
         FileDialogResult show_dialog(FileDialogOperation operation, const FileDialogOptions& options = {});
         FileDialogWidget& set_label(std::string label, LabelPlacement placement = LabelPlacement::Above);
         FileDialogWidget& set_operation(FileDialogOperation operation);
+        FileDialogWidget& set_placeholder(std::string placeholder);
+        TextWidget& label() {
+            return m_label;
+        }
+
+        const TextWidget& label() const {
+            return m_label;
+        }
+
+        ButtonWidget& button() {
+            return m_button;
+        }
+
+        const ButtonWidget& button() const {
+            return m_button;
+        }
+
         /// owns options and filters. clicking opens OpenFile unless another operation is configured.
         FileDialogWidget& set_options(FileDialogOptions options);
         /// receives every accepted result, including all paths from a multiple selection.
@@ -36,6 +53,7 @@ namespace ui {
         void update_label_layout();
 
         std::string m_value;
+        std::string m_placeholder = "select a file";
         TextWidget& m_label;
         ButtonWidget& m_button;
         LabelPlacement m_label_placement = LabelPlacement::Above;

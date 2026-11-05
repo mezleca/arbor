@@ -71,6 +71,8 @@ static Key key_from_sdl(SDL_Keycode key) {
             return Key::Up;
         case SDLK_DOWN:
             return Key::Down;
+        case SDLK_SPACE:
+            return Key::Space;
         default:
             return Key::Unknown;
     }

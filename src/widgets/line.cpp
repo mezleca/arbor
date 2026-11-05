@@ -21,3 +21,9 @@ bool LineWidget::paint() {
     painter().line(m_start, m_end, current_style.color().value, current_style.border_thickness());
     return true;
 }
+
+LineWidget& LineWidget::set_points(ImVec2 start, ImVec2 end) {
+    m_start = start;
+    m_end = end;
+    return *this;
+}

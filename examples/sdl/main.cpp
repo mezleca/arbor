@@ -23,7 +23,6 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     SDL_Window* window = SDL_CreateWindow("imgui-ui sdl", 1120, 920, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-
     if (window == nullptr) {
         SDL_Quit();
         return 1;

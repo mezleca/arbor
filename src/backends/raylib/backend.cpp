@@ -171,6 +171,8 @@ static Key core_key(int key) {
             return Key::Up;
         case KEY_DOWN:
             return Key::Down;
+        case KEY_SPACE:
+            return Key::Space;
         default:
             return Key::Unknown;
     }

@@ -85,6 +85,7 @@ namespace ui {
         Right,
         Up,
         Down,
+        Space,
     };
 
     struct UiEvent {

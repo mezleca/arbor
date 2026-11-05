@@ -3,6 +3,7 @@
 
 #include <imgui.h>
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 using namespace ui;
@@ -16,12 +17,32 @@ void TextWidget::apply_theme_defaults(const Theme& theme) {
 }
 
 TextWidget& TextWidget::set_wrap(float width) {
+    m_wrap_available = false;
     if (m_text.wrap_width() != width) {
         m_text.set_wrap(width);
         invalidate_measure();
     }
 
     return *this;
+}
+
+TextWidget& TextWidget::set_wrap_available(bool wrap) {
+    m_wrap_available = wrap;
+    m_text.set_wrap(-1.0f);
+    invalidate_measure();
+    return *this;
+}
+
+TextWidget& TextWidget::set_alignment(ImVec2 alignment) {
+    m_alignment = {std::clamp(alignment.x, 0.0f, 1.0f), std::clamp(alignment.y, 0.0f, 1.0f)};
+    return *this;
+}
+
+ImVec2 TextWidget::measure_size(ImVec2 allocation) const {
+    if (!m_wrap_available) return Node::measure_size(allocation);
+    const float width = content_size(allocation).x;
+    m_text.set_wrap(std::isfinite(width) ? std::max(1.0f, width) : -1.0f);
+    return outer_size(m_text.text_size());
 }
 
 TextWidget& TextWidget::set_overflow(TextOverflow overflow) {
@@ -42,6 +63,7 @@ TextWidget& TextWidget::set_text(std::string text) {
 }
 
 void TextWidget::on_measure() {
+    if (m_wrap_available) m_text.set_wrap(-1.0f);
     m_text.set_font(font(), font_size());
     m_text.set_line_height(computed_style().line_height());
     const ImVec2 text_size = m_text.text_size();
@@ -53,6 +75,11 @@ bool TextWidget::paint() {
     const ImVec2 minimum = ImGui::GetCursorScreenPos();
     const Rect outer = Rect::from_position_size(minimum, layout().size());
     const Rect content = content_rect(outer);
+    const ImVec2 text_size = m_text.text_size();
+    const ImVec2 position = {
+        content.min.x + std::max(0.0f, content.size().x - text_size.x) * m_alignment.x,
+        content.min.y + std::max(0.0f, content.size().y - text_size.y) * m_alignment.y,
+    };
 
     const Painter paint = painter();
     paint.frame(outer, current_style);
@@ -63,9 +90,9 @@ bool TextWidget::paint() {
 
     if (m_overflow == TextOverflow::Ellipsis) {
         // ancestor overflow narrows the visible width without changing this node's content rect.
-        paint.text_ellipsis(content.min, current_style.color().value, m_text, paint.visible_clip(clip_rect));
+        paint.text_ellipsis(position, current_style.color().value, m_text, paint.visible_clip(clip_rect));
     } else {
-        paint.text(content.min, current_style.color().value, m_text, clipped ? &clip_rect : nullptr);
+        paint.text(position, current_style.color().value, m_text, clipped ? &clip_rect : nullptr);
     }
 
     return true;

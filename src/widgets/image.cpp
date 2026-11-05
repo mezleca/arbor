@@ -35,10 +35,7 @@ ImVec2 ImageWidget::measure_content(ImVec2 available) const {
     const ImVec2 children_size = measure_children(available);
     if (m_texture != nullptr) {
         const ImVec2 texture_size = m_texture->size();
-        return {
-            std::max(texture_size.x, children_size.x),
-            std::max({texture_size.y, children_size.y, font_size() * computed_style().line_height()})
-        };
+        return {std::max(texture_size.x, children_size.x), std::max(texture_size.y, children_size.y)};
     }
     return children_size;
 }
@@ -58,7 +55,9 @@ void ImageWidget::paint_content(const PaintContext& context) {
                                     : std::max(content_size.x / texture_size.x, content_size.y / texture_size.y);
             const ImVec2 size = {texture_size.x * scale, texture_size.y * scale};
             image = Rect::from_position_size(
-                {content.min.x + ((content_size.x - size.x) * 0.5F), content.min.y + ((content_size.y - size.y) * 0.5F)}, size
+                {content.min.x + ((content_size.x - size.x) * m_alignment.x),
+                 content.min.y + ((content_size.y - size.y) * m_alignment.y)},
+                size
             );
         }
     }
@@ -70,9 +69,20 @@ void ImageWidget::paint_content(const PaintContext& context) {
         draw_list.PushClipRect(content.min, content.max, true);
     }
 
-    context.painter.image(texture_id, image, {0, 0}, {1, 1}, context.style.color().value, context.style.border_radius());
+    context.painter.image(texture_id, image, m_uv_min, m_uv_max, context.style.color().value, context.style.border_radius());
 
     if (clip_image) {
         draw_list.PopClipRect();
     }
+}
+
+ImageWidget& ImageWidget::set_alignment(ImVec2 alignment) {
+    m_alignment = {std::clamp(alignment.x, 0.0f, 1.0f), std::clamp(alignment.y, 0.0f, 1.0f)};
+    return *this;
+}
+
+ImageWidget& ImageWidget::set_uv(ImVec2 minimum, ImVec2 maximum) {
+    m_uv_min = minimum;
+    m_uv_max = maximum;
+    return *this;
 }

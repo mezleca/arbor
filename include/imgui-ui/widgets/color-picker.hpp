@@ -20,6 +20,11 @@ namespace ui {
 
         ColorPickerWidget& set_label(std::string label, LabelPlacement placement = LabelPlacement::Above);
         bool set_color(const Color& color);
+        const Color& color() const {
+            return m_value.value();
+        }
+
+        ColorPickerWidget& set_alpha_visible(bool visible);
         void open();
         void close();
 
@@ -30,6 +35,9 @@ namespace ui {
         TextWidget& label();
         Widget& preview();
         Container& popup();
+        const TextWidget& label() const;
+        const Widget& preview() const;
+        const Container& popup() const;
 
     protected:
         void apply_theme_defaults(const Theme& theme) override;
@@ -46,6 +54,7 @@ namespace ui {
         ColorPickerPreviewNode* m_preview = nullptr;
         ColorPickerPopup* m_popup = nullptr;
         bool m_open = false;
+        bool m_alpha_visible = true;
         LabelPlacement m_label_placement = LabelPlacement::Above;
         ImVec2 m_label_spacing = {8.0F, 10.0F};
     };

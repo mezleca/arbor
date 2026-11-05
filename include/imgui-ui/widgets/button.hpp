@@ -11,7 +11,11 @@
 namespace ui {
     class ButtonWidget : public Widget {
     public:
-        explicit ButtonWidget(std::string text, LayoutSize size = {fit(), fit()});
+        /// an empty label leaves the content area available for composed child widgets
+        explicit ButtonWidget(std::string text = {}, LayoutSize size = {fit(), fit()});
+        const std::string& text() const {
+            return m_text.str();
+        }
 
         ButtonWidget& set_text_alignment(ImVec2 alignment) {
             m_text_alignment = alignment;
@@ -30,6 +34,8 @@ namespace ui {
     protected:
         void apply_theme_defaults(const Theme& theme) override;
         void click_event(UiEvent&) override;
+        void mouse_press_event(UiEvent& event) override;
+        void key_press_event(UiEvent& event) override;
         void on_measure() override;
         ImVec2 measure_content(ImVec2 available) const override;
 

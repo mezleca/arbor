@@ -1,5 +1,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <imgui-ui/backends/opengl/texture-loader.hpp>
 #include <imgui-ui/backends/sdl/backend.hpp>
@@ -18,6 +19,7 @@
 #include <imgui-ui/widgets/image.hpp>
 #include <imgui-ui/widgets/number-input.hpp>
 #include <imgui-ui/widgets/text.hpp>
+#include <imgui-ui/widgets/text-input.hpp>
 
 #include <SDL3/SDL.h>
 #include <glad/gl.h>
@@ -1244,6 +1246,30 @@ TEST_CASE("pointer blocker prevents native content mutation but keeps descendant
 
     click(overlay_position);
     CHECK(overlay_value);
+}
+
+TEST_CASE("searchable dropdown stays open after releasing its trigger", "[dropdown][input][regression]") {
+    SdlVideoSession sdl({400.0f, 300.0f});
+    ui::Runtime runtime;
+    ui::Surface surface(runtime, {.backend = make_sdl_backend(sdl)});
+    const auto context = ui_test::prepare_surface(surface);
+    auto& dropdown = surface.root().add<ui::DropdownWidget>();
+    dropdown.set_size({ui::px(300.0f), ui::fit()});
+    dropdown.set_options({{"Online", "online"}, {"Away", "away"}});
+    auto& search = dropdown.trigger().add<ui::TextInputWidget>();
+    search.set_flags(ImGuiInputTextFlags_AutoSelectAll);
+    search.set_value("Online");
+    search.on_event(ui::EventType::Click, [&](ui::UiEvent&) { dropdown.open(); });
+    ui_test::draw_surface(surface);
+    const ImVec2 position = ui_test::center(search.frame().layout().visual_rect());
+    send_sdl_pointer(surface, SDL_EVENT_MOUSE_MOTION, position);
+    send_sdl_pointer(surface, SDL_EVENT_MOUSE_BUTTON_DOWN, position);
+    if (GENERATE(false, true)) ui_test::draw_surface(surface);
+    REQUIRE_FALSE(dropdown.is_open());
+    send_sdl_pointer(surface, SDL_EVENT_MOUSE_BUTTON_UP, position);
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+    REQUIRE(dropdown.is_open());
 }
 
 TEST_CASE("dropdown selection and cursor use the sdl input path", "[dropdown][input][regression]") {

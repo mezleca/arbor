@@ -13,6 +13,7 @@
 #include <string_view>
 #include <utility>
 #include <unordered_map>
+#include <vector>
 
 namespace ui {
     enum class TextureRetention : std::uint8_t {
@@ -35,6 +36,14 @@ namespace ui {
         std::size_t referenced_count = 0;
         std::size_t cpu_bytes = 0;
         std::size_t gpu_bytes = 0;
+    };
+
+    struct TextureEntryInfo {
+        std::string id;
+        ImVec2 size;
+        TextureMemoryUsage memory;
+        TextureRetention retention = TextureRetention::Cached;
+        std::size_t handle_count = 0;
     };
 
     class RegistryTexture;
@@ -72,6 +81,8 @@ namespace ui {
         const TextureCacheConfig& cache_config() const;
         // nullptr sums gpu bytes across all contexts. cpu bytes are always global.
         TextureCacheStats stats(ImGuiContext* context = nullptr) const;
+        // copies metadata without retaining textures, uploading gpu data or updating eviction order
+        std::vector<TextureEntryInfo> entries(ImGuiContext* context = nullptr) const;
 
         // called after rendering with this graphics/imgui context current. nullptr uses the current imgui context.
         // budgets are soft when referenced, resident, or current-frame resources prevent further eviction.

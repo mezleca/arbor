@@ -151,6 +151,18 @@ TextureCacheStats TextureRegistry::stats(ImGuiContext* context) const {
     return result;
 }
 
+std::vector<TextureEntryInfo> TextureRegistry::entries(ImGuiContext* context) const {
+    std::vector<TextureEntryInfo> result;
+    result.reserve(m_assets.size());
+    for (const auto& [id, texture] : m_assets) {
+        result.push_back(
+            {id, texture->size(), texture->memory_usage(context), texture->m_retention,
+             static_cast<std::size_t>(texture.use_count() - 1)}
+        );
+    }
+    return result;
+}
+
 void TextureRegistry::collect(ImGuiContext* context) {
     if (context == nullptr) {
         context = ImGui::GetCurrentContext();

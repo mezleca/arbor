@@ -1,7 +1,6 @@
 #pragma once
 
 #include <imgui-ui/runtime.hpp>
-
 #include <string_view>
 
 namespace ui {

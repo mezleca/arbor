@@ -5,6 +5,7 @@
 #include "imgui-context.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <algorithm>
 #include <imgui_internal.h>
 #include <memory>
 #include <string>
@@ -108,6 +109,14 @@ TEST_CASE("texture handles share loads and keep cached resources after a scope e
         auto second = registry.acquire("cover", std::filesystem::path{"different-source"});
         REQUIRE(first == second);
         REQUIRE(fixture.probe->textures.at("cover")->loads == 1);
+        const auto entries = registry.entries();
+        const auto cover = std::ranges::find(entries, "cover", &TextureEntryInfo::id);
+        REQUIRE(cover != entries.end());
+        REQUIRE(cover->handle_count == 2);
+        REQUIRE(cover->size.x == 4.0f);
+        REQUIRE(cover->memory.cpu_bytes == 64);
+        REQUIRE(cover->retention == TextureRetention::Cached);
+        REQUIRE(fixture.probe->textures.at("cover")->uploads == 0);
         REQUIRE(registry.stats().referenced_count == 1);
     }
     registry.collect();
@@ -123,6 +132,7 @@ TEST_CASE("cpu texture budget evicts unused covers in access order and reloads o
     registry.acquire("older", std::string_view{});
     registry.acquire("recent", std::string_view{});
     registry.find_handle("older");
+    registry.entries();
     registry.collect();
     REQUIRE(registry.find_handle("older") != nullptr);
     REQUIRE(registry.find_handle("recent") == nullptr);

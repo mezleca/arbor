@@ -87,7 +87,13 @@ bool FileDialogWidget::set_value(std::string_view value) {
     if (m_value == value) return false;
 
     m_value = value;
-    m_button.set_text(m_value.empty() ? "select a file" : m_value);
+    m_button.set_text(m_value.empty() ? m_placeholder : m_value);
     notify_change();
     return true;
+}
+
+FileDialogWidget& FileDialogWidget::set_placeholder(std::string placeholder) {
+    m_placeholder = std::move(placeholder);
+    if (m_value.empty()) m_button.set_text(m_placeholder);
+    return *this;
 }

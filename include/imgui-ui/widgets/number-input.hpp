@@ -13,6 +13,13 @@
 #include <utility>
 
 namespace ui {
+    enum class NumberInputMode : uint8_t {
+        Automatic,
+        Slider,
+        Drag,
+        Input,
+    };
+
     template <typename T>
     concept NumberInputType = std::is_arithmetic_v<T> && !std::same_as<T, bool> && sizeof(T) <= sizeof(std::uint64_t);
 
@@ -28,9 +35,9 @@ namespace ui {
         );
 
         NumberInputWidget& set_label(std::string label, LabelPlacement placement = LabelPlacement::Inline);
-        NumberInputWidget& set_minimum(double minimum);
-        NumberInputWidget& set_maximum(double maximum);
-        NumberInputWidget& set_range(double minimum, double maximum);
+        NumberInputWidget& set_minimum(T minimum);
+        NumberInputWidget& set_maximum(T maximum);
+        NumberInputWidget& set_range(T minimum, T maximum);
         NumberInputWidget& clear_range();
         NumberInputWidget& set_speed(float speed);
         NumberInputWidget& set_format(std::string format);
@@ -43,6 +50,39 @@ namespace ui {
         }
 
         bool set_value(T value);
+        /// ranges constrain interaction, programmatic values are stored unchanged
+        const T& value() const {
+            return m_value.value();
+        }
+
+        std::optional<T> minimum() const {
+            return m_minimum;
+        }
+
+        std::optional<T> maximum() const {
+            return m_maximum;
+        }
+
+        NumberInputWidget& set_mode(NumberInputMode mode) {
+            m_mode = mode;
+            return *this;
+        }
+
+        TextWidget& label() {
+            return *m_label;
+        }
+
+        const TextWidget& label() const {
+            return *m_label;
+        }
+
+        StyledNode& field() {
+            return *m_field;
+        }
+
+        const StyledNode& field() const {
+            return *m_field;
+        }
 
     protected:
         void apply_theme_defaults(const Theme& theme) override;
@@ -60,8 +100,9 @@ namespace ui {
         TextWidget* m_label = nullptr;
         NumberInputFieldNode<T>* m_field = nullptr;
         std::string m_format;
-        std::optional<double> m_minimum = 0;
-        std::optional<double> m_maximum = 100;
+        std::optional<T> m_minimum = T{0};
+        std::optional<T> m_maximum = T{100};
+        NumberInputMode m_mode = NumberInputMode::Automatic;
         Color m_thumb_color;
         LabelPlacement m_label_placement = LabelPlacement::Inline;
         ImVec2 m_label_spacing;
@@ -200,19 +241,19 @@ namespace ui {
     }
 
     template <NumberInputType T>
-    NumberInputWidget<T>& NumberInputWidget<T>::set_minimum(double minimum) {
+    NumberInputWidget<T>& NumberInputWidget<T>::set_minimum(T minimum) {
         m_minimum = minimum;
         return *this;
     }
 
     template <NumberInputType T>
-    NumberInputWidget<T>& NumberInputWidget<T>::set_maximum(double maximum) {
+    NumberInputWidget<T>& NumberInputWidget<T>::set_maximum(T maximum) {
         m_maximum = maximum;
         return *this;
     }
 
     template <NumberInputType T>
-    NumberInputWidget<T>& NumberInputWidget<T>::set_range(double minimum, double maximum) {
+    NumberInputWidget<T>& NumberInputWidget<T>::set_range(T minimum, T maximum) {
         m_minimum = std::min(minimum, maximum);
         m_maximum = std::max(minimum, maximum);
         return *this;
@@ -274,18 +315,26 @@ namespace ui {
     template <NumberInputType T>
     bool NumberInputWidget<T>::draw_value() {
         constexpr ImGuiDataType data_type = scalar_type();
-        const T minimum = static_cast<T>(m_minimum.value_or(0.0));
-        const T maximum = static_cast<T>(m_maximum.value_or(0.0));
-        const void* minimum_ptr = m_minimum.has_value() ? &minimum : nullptr;
-        const void* maximum_ptr = m_maximum.has_value() ? &maximum : nullptr;
+        const T* minimum = m_minimum ? &*m_minimum : nullptr;
+        const T* maximum = m_maximum ? &*m_maximum : nullptr;
         const char* format = m_format.empty() ? nullptr : m_format.c_str();
 
         return m_value.edit([&](T& value) {
-            if (m_thumb_visible && m_minimum.has_value() && m_maximum.has_value() && maximum > minimum) {
-                return ImGui::SliderScalar("##value", data_type, &value, &minimum, &maximum, format, m_flags);
+            if (m_mode == NumberInputMode::Input) {
+                const T previous = value;
+                const bool changed = ImGui::InputScalar("##value", data_type, &value, nullptr, nullptr, format);
+                if (changed) {
+                    if (m_minimum) value = std::max(value, *m_minimum);
+                    if (m_maximum) value = std::min(value, *m_maximum);
+                }
+                return changed && value != previous;
+            }
+            const bool slider = m_mode == NumberInputMode::Slider || (m_mode == NumberInputMode::Automatic && m_thumb_visible);
+            if (slider && minimum && maximum && *maximum > *minimum) {
+                return ImGui::SliderScalar("##value", data_type, &value, minimum, maximum, format, m_flags);
             }
 
-            return ImGui::DragScalar("##value", data_type, &value, m_speed, minimum_ptr, maximum_ptr, format, m_flags);
+            return ImGui::DragScalar("##value", data_type, &value, m_speed, minimum, maximum, format, m_flags);
         });
     }
 } // namespace ui

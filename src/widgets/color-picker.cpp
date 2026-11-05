@@ -36,12 +36,14 @@ static void draw_picker_gradient(
     );
 }
 
-static std::string format_hex(ImColor color) {
-    return std::format(
+static std::string format_hex(ImColor color, bool alpha = true) {
+    std::string result = std::format(
         "#{:02X}{:02X}{:02X}{:02X}", static_cast<unsigned int>(saturate(color.Value.x) * 255.0F),
         static_cast<unsigned int>(saturate(color.Value.y) * 255.0F), static_cast<unsigned int>(saturate(color.Value.z) * 255.0F),
         static_cast<unsigned int>(saturate(color.Value.w) * 255.0F)
     );
+    if (!alpha) result.resize(7);
+    return result;
 }
 
 static int hex_digit(char value) {
@@ -126,8 +128,8 @@ private:
 
 class ui::ColorPickerControlsNode final : public Widget {
 public:
-    ColorPickerControlsNode(ColorPickerWidget& owner, std::string& hex)
-        : Widget("controls", "ColorPickerControls", InputMode::None), m_owner(owner), m_hex(hex) {
+    explicit ColorPickerControlsNode(ColorPickerWidget& owner)
+        : Widget("controls", "ColorPickerControls", InputMode::None), m_owner(owner) {
         set_size({grow(), grow()});
     }
 
@@ -143,7 +145,8 @@ private:
     void set_hsv(float hue, float saturation, float value, float alpha);
 
     ColorPickerWidget& m_owner;
-    std::string& m_hex;
+    float m_hue = 0.0f;
+    float m_saturation = 0.0f;
 };
 
 class ui::ColorPickerPopup final : public LayerContainer {
@@ -152,18 +155,25 @@ public:
         : LayerContainer("popup", LayerMode::Popup, "ColorPickerPopup"), m_owner(owner) {
         set_id(std::format("##color-picker-{}", identity()));
 
-        m_controls = &add<ColorPickerControlsNode>(m_owner, m_hex);
-        m_hex_input = &add<TextInputWidget>(m_hex, "", LabelPlacement::Inline, "hex");
+        m_controls = &add<ColorPickerControlsNode>(m_owner);
+        m_hex_input = &add<TextInputWidget>();
+        m_hex_input->set_id("hex");
         m_hex_input->on_change([this] {
+            if (m_editing_hex) return;
             ImColor parsed;
-            if (parse_hex(m_hex, parsed)) {
+            if (parse_hex(m_hex_input->value(), parsed)) {
+                m_editing_hex = true;
                 m_owner.set_color(parsed);
+                m_editing_hex = false;
             }
         });
     }
 
-    void show() {
-        m_hex = format_hex(m_owner.m_value.value().rgba());
+    void sync_hex() {
+        if (m_editing_hex) return;
+        m_editing_hex = true;
+        m_hex_input->set_value(format_hex(m_owner.color().rgba(), m_owner.m_alpha_visible));
+        m_editing_hex = false;
     }
 
 private:
@@ -213,9 +223,9 @@ private:
     }
 
     ColorPickerWidget& m_owner;
-    std::string m_hex;
     ColorPickerControlsNode* m_controls = nullptr;
     TextInputWidget* m_hex_input = nullptr;
+    bool m_editing_hex = false;
 };
 
 void ColorPickerControlsNode::paint_content(const PaintContext& context) {
@@ -230,6 +240,10 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
     float value = 0.0F;
 
     ImGui::ColorConvertRGBtoHSV(color.Value.x, color.Value.y, color.Value.z, hue, saturation, value);
+    if (saturation > 0.0f) m_hue = hue;
+    if (value > 0.0f) m_saturation = saturation;
+    if (saturation == 0.0f) hue = m_hue;
+    if (value == 0.0f) saturation = m_saturation;
 
     const ImVec2 origin = content.min;
     const float selector_size =
@@ -254,10 +268,9 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
         color = m_owner.m_value.value().rgba();
     }
 
-    if (active_area("alpha", alpha_bar)) {
+    if (m_owner.m_alpha_visible && active_area("alpha", alpha_bar)) {
         color.Value.w = saturate((ImGui::GetIO().MousePos.x - alpha_bar.min.x) / alpha_bar.size().x);
         m_owner.set_color(color);
-        m_hex = format_hex(color);
     }
 
     const Painter paint = painter();
@@ -276,13 +289,15 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
     }
     paint.rect_outline(hue_bar, theme.controls.border_color);
 
-    draw_checkerboard(paint, alpha_bar, bar_size * 0.5F, theme.background_secondary_color, theme.background_tertiary_color);
+    if (m_owner.m_alpha_visible) {
+        draw_checkerboard(paint, alpha_bar, bar_size * 0.5f, theme.background_secondary_color, theme.background_tertiary_color);
 
-    const ImColor opaque = ImColor(color.Value.x, color.Value.y, color.Value.z, 1.0F);
-    const ImColor transparent = ImColor(color.Value.x, color.Value.y, color.Value.z, 0.0F);
+        const ImColor opaque = ImColor(color.Value.x, color.Value.y, color.Value.z, 1.0f);
+        const ImColor transparent = ImColor(color.Value.x, color.Value.y, color.Value.z, 0.0f);
 
-    draw_picker_gradient(draw_list, alpha_bar, transparent, opaque, opaque, transparent);
-    paint.rect_outline(alpha_bar, theme.controls.border_color);
+        draw_picker_gradient(draw_list, alpha_bar, transparent, opaque, opaque, transparent);
+        paint.rect_outline(alpha_bar, theme.controls.border_color);
+    }
 
     const ImVec2 selector_cursor = {
         selector.min.x + (saturation * selector.size().x),
@@ -299,19 +314,22 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
         {hue_bar.min.x - 2.0F, hue_cursor_y + 1.0F}, {hue_bar.max.x + 2.0F, hue_cursor_y + 1.0F}, theme.background_color, 1.0F
     );
 
-    const float alpha_cursor_x = alpha_bar.min.x + (color.Value.w * alpha_bar.size().x);
+    if (m_owner.m_alpha_visible) {
+        const float alpha_cursor_x = alpha_bar.min.x + (color.Value.w * alpha_bar.size().x);
 
-    paint.line({alpha_cursor_x, alpha_bar.min.y - 2.0F}, {alpha_cursor_x, alpha_bar.max.y + 2.0F}, theme.text_color, 2.0F);
+        paint.line({alpha_cursor_x, alpha_bar.min.y - 2.0f}, {alpha_cursor_x, alpha_bar.max.y + 2.0f}, theme.text_color, 2.0f);
 
-    paint.line(
-        {alpha_cursor_x + 1.0F, alpha_bar.min.y - 2.0F}, {alpha_cursor_x + 1.0F, alpha_bar.max.y + 2.0F}, theme.background_color,
-        1.0F
-    );
+        paint.line(
+            {alpha_cursor_x + 1.0f, alpha_bar.min.y - 2.0f}, {alpha_cursor_x + 1.0f, alpha_bar.max.y + 2.0f},
+            theme.background_color, 1.0f
+        );
+    }
 }
 
 void ColorPickerControlsNode::set_hsv(float hue, float saturation, float value, float alpha) {
+    m_hue = hue;
+    m_saturation = saturation;
     m_owner.set_color(hsv_color(hue, saturation, value, alpha));
-    m_hex = format_hex(m_owner.m_value.value().rgba());
 }
 
 ColorPickerWidget::ColorPickerWidget(WidgetValue<Color> value, std::string label, LabelPlacement placement, std::string id)
@@ -369,6 +387,7 @@ bool ColorPickerWidget::set_color(const Color& color) {
         return false;
     }
 
+    m_popup->sync_hex();
     notify_change();
     return true;
 }
@@ -379,7 +398,7 @@ void ColorPickerWidget::open() {
     }
 
     m_open = true;
-    m_popup->show();
+    m_popup->sync_hex();
     m_popup->open_popup();
     m_preview->set_open_style(true);
 }
@@ -404,4 +423,22 @@ Widget& ColorPickerWidget::preview() {
 
 Container& ColorPickerWidget::popup() {
     return *m_popup;
+}
+
+const TextWidget& ColorPickerWidget::label() const {
+    return *m_label_node;
+}
+
+const Widget& ColorPickerWidget::preview() const {
+    return *m_preview;
+}
+
+const Container& ColorPickerWidget::popup() const {
+    return *m_popup;
+}
+
+ColorPickerWidget& ColorPickerWidget::set_alpha_visible(bool visible) {
+    m_alpha_visible = visible;
+    m_popup->sync_hex();
+    return *this;
 }
