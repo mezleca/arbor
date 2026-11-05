@@ -7,6 +7,7 @@
 
 #include <cfloat>
 #include <imgui_stdlib.h>
+#include <imgui_internal.h>
 #include <algorithm>
 
 using namespace ui;
@@ -25,6 +26,10 @@ public:
         return m_changed;
     }
 
+    bool submitted() const {
+        return m_submitted;
+    }
+
 private:
     void on_measure() override {
         ImGui::PushFont(font(), font_size());
@@ -41,11 +46,20 @@ private:
         }
 
         ImGui::PushID(this);
-        const float padding_y = std::max(0.0F, (layout().size().y - layout().measured_size().y) * 0.5F);
+        if (m_owner.m_reload_requested) {
+            if (auto* state = ImGui::GetInputTextState(ImGui::GetID("##value"))) state->ReloadUserBufAndMoveToEnd();
+            m_owner.m_reload_requested = false;
+        }
+        const float padding_y = std::max(0.0f, (layout().size().y - layout().measured_size().y) * 0.5f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {ImGui::GetStyle().FramePadding.x, padding_y});
         ImGui::SetNextItemWidth(-FLT_MIN);
-        m_changed =
-            m_owner.m_value.edit([this](std::string& value) { return ImGui::InputText("##value", &value, m_owner.flags()); });
+        m_changed = m_owner.m_value.edit([this](std::string& value) {
+            auto flags = m_owner.flags();
+            if (m_owner.m_on_submit) flags |= ImGuiInputTextFlags_EnterReturnsTrue;
+            const bool accepted = ImGui::InputTextWithHint("##value", m_owner.m_hint.c_str(), &value, flags);
+            m_submitted = m_owner.m_on_submit && accepted;
+            return ImGui::IsItemEdited();
+        });
         ImGui::PopStyleVar();
         ImGui::PopID();
         return true;
@@ -53,6 +67,7 @@ private:
 
     TextInputWidget& m_owner;
     bool m_changed = false;
+    bool m_submitted = false;
 };
 
 TextInputWidget::TextInputWidget(WidgetValue<std::string> value, std::string label, LabelPlacement placement, std::string id)
@@ -151,6 +166,16 @@ TextInputWidget& TextInputWidget::set_flags(ImGuiInputTextFlags flags) {
     return *this;
 }
 
+TextInputWidget& TextInputWidget::set_hint(std::string hint) {
+    m_hint = std::move(hint);
+    return *this;
+}
+
+TextInputWidget& TextInputWidget::on_submit(std::function<void()> callback) {
+    m_on_submit = std::move(callback);
+    return *this;
+}
+
 TextInputWidget& TextInputWidget::set_icon(TextureHandle icon) {
     m_icon_node->set_visible(icon != nullptr);
     m_icon_node->set_texture(std::move(icon));
@@ -162,6 +187,7 @@ bool TextInputWidget::set_value(std::string value) {
         return false;
     }
 
+    m_reload_requested = true;
     notify_change();
     return true;
 }
@@ -176,6 +202,7 @@ void TextInputWidget::on_draw_end() {
     if (m_field_node->changed()) {
         notify_change();
     }
+    if (m_field_node->submitted() && m_on_submit) m_on_submit();
 
     Container::on_draw_end();
 }

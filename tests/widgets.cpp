@@ -130,6 +130,47 @@ TEST_CASE("text input hover and focus are limited to its field", "[TextInputWidg
     REQUIRE(field->style_type() == StyleType::ACTIVE);
 }
 
+TEST_CASE("text input separates edits and submission and reloads active values", "[TextInputWidget][input][regression]") {
+    Runtime runtime;
+    auto surface = ui_test::make_surface(runtime);
+    std::string value;
+    int changes = 0;
+    int submissions = 0;
+    auto& input = surface.root().add<TextInputWidget>(value);
+    input.set_size({px(300.0f), px(48.0f)});
+    input.set_hint("Search").on_submit([&] { ++submissions; });
+    input.on_change([&] { ++changes; });
+    const auto context = ui_test::prepare_surface(surface, {400.0f, 180.0f});
+    ui_test::draw_surface(surface);
+    auto press = ui_test::pointer_event(EventType::PointerDown, ui_test::center(input.frame().layout().visual_rect()));
+    surface.dispatch(press);
+    ui_test::draw_surface(surface);
+    ui_test::draw_surface(surface);
+
+    auto& io = ImGui::GetIO();
+    io.AddInputCharactersUTF8("hello");
+    ui_test::draw_surface(surface);
+    REQUIRE(value == "hello");
+    REQUIRE(changes == 1);
+    REQUIRE(submissions == 0);
+
+    REQUIRE(input.set_value("replacement"));
+    REQUIRE(changes == 2);
+    io.AddInputCharactersUTF8("!");
+    ui_test::draw_surface(surface);
+    REQUIRE(value == "replacement!");
+    REQUIRE(changes == 3);
+    REQUIRE_FALSE(input.set_value(value));
+
+    io.AddKeyEvent(ImGuiKey_Enter, true);
+    ui_test::draw_surface(surface);
+    REQUIRE(submissions == 1);
+    REQUIRE(changes == 3);
+    io.AddKeyEvent(ImGuiKey_Enter, false);
+    ui_test::draw_surface(surface);
+    REQUIRE(submissions == 1);
+}
+
 TEST_CASE("nested containers keep default padding empty and route checkbox clicks", "[container][input][regression]") {
     Runtime runtime;
     ui::Surface surface = ui_test::make_surface(runtime);

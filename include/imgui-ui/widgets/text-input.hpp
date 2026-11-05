@@ -23,6 +23,13 @@ namespace ui {
         TextInputWidget& set_icon(Texture* icon);
         TextInputWidget& set_icon(TextureHandle icon);
         TextInputWidget& set_flags(ImGuiInputTextFlags flags);
+        TextInputWidget& set_hint(std::string hint);
+        /// reports enter separately from text edits, including submission of an unchanged value
+        TextInputWidget& on_submit(std::function<void()> callback);
+
+        Container& frame() {
+            return *m_input_node;
+        }
         ImGuiInputTextFlags flags() const {
             return m_flags;
         }
@@ -41,6 +48,8 @@ namespace ui {
         void on_draw_end() override;
 
         WidgetValue<std::string> m_value;
+        std::string m_hint;
+        std::function<void()> m_on_submit;
         TextWidget* m_label_node = nullptr;
         Container* m_input_node = nullptr;
         ImageWidget* m_icon_node = nullptr;
@@ -49,5 +58,6 @@ namespace ui {
         ImVec2 m_label_spacing;
         ImGuiInputTextFlags m_flags = ImGuiInputTextFlags_None;
         bool m_focus_requested = false;
+        bool m_reload_requested = false;
     };
 } // namespace ui
