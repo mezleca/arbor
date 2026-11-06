@@ -31,6 +31,8 @@
 
 #include <algorithm>
 #include <array>
+#include <fstream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <vector>
@@ -906,6 +908,20 @@ TEST_CASE("nested tree shadows escape their parent body clip", "[render][regress
     CHECK(pixel[0] < 80);
     CHECK(pixel[1] < 80);
     CHECK(pixel[2] < 80);
+}
+
+TEST_CASE("raster textures decode from memory without a graphics context", "[texture][raster]") {
+    const auto path = std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "images/tiny.jpg";
+    std::ifstream file(path, std::ios::binary);
+    REQUIRE(file.is_open());
+    const std::string bytes{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+    ui::OpenGLTextureLoader loader;
+    auto memory = loader.load(std::string_view(bytes), "memory");
+    auto disk = loader.load(path, "disk");
+    REQUIRE(memory->size().x == disk->size().x);
+    REQUIRE(memory->size().y == disk->size().y);
+    REQUIRE(memory->memory_usage().cpu_bytes > 0);
+    REQUIRE(memory->memory_usage().gpu_bytes == 0);
 }
 
 TEST_CASE("svg textures cache uploads by size and release their context", "[texture][svg]") {

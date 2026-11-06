@@ -405,6 +405,12 @@ std::unique_ptr<Texture> OpenGLTextureLoader::load(std::string_view content, std
         return std::make_unique<OpenGLGifTexture>(std::vector<uint8_t>(content.begin(), content.end()));
     }
 
+    if (std::in_range<int>(content.size())) {
+        if (auto* surface = plutovg_surface_load_from_image_data(content.data(), static_cast<int>(content.size()))) {
+            return std::make_unique<OpenGLRasterTexture>(surface);
+        }
+    }
+
     std::unique_ptr<lunasvg::Document> document = lunasvg::Document::loadFromData(std::string{content});
     if (document == nullptr) {
         throw std::runtime_error("failed to load texture data");
