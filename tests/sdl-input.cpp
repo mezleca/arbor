@@ -116,6 +116,46 @@ static void draw_frame(ui::Surface& surface, std::optional<float> delta_time = s
     surface.end_frame();
 }
 
+TEST_CASE("disabled widgets keep their style and native cursor across clicks", "[cursor][input][regression]") {
+    SdlVideoSession sdl({320.0f, 180.0f});
+    ui::Runtime runtime;
+    ui::Surface surface(runtime, {.backend = make_sdl_backend(sdl)});
+    const auto context = ui_test::prepare_surface(surface);
+    auto& button = surface.root().add<ui::ButtonWidget>("disabled");
+    if (GENERATE(false, true)) {
+        button.set_enabled(false);
+    } else {
+        button.set_visual_style(ui::StyleType::DISABLED);
+    }
+    int clicks = 0;
+    button.on_click([&] { ++clicks; });
+    ui_test::draw_surface(surface);
+    const ImVec2 position = ui_test::center(button.layout().visual_rect());
+    send_sdl_pointer(surface, SDL_EVENT_MOUSE_MOTION, position);
+    ui_test::draw_surface(surface);
+    SDL_Cursor* cursor = SDL_GetCursor();
+    for (SDL_EventType type : {SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP}) {
+        send_sdl_pointer(surface, type, position);
+        ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        surface.begin_frame();
+        SDL_Cursor* frame_cursor = SDL_GetCursor();
+        surface.update(0.1f);
+        surface.draw();
+        surface.end_frame();
+        CHECK(frame_cursor == cursor);
+        CHECK(SDL_GetCursor() == cursor);
+        CHECK(button.style_type() == ui::StyleType::DISABLED);
+        CHECK(ImGui::GetMouseCursor() == ImGuiMouseCursor_NotAllowed);
+        CHECK_FALSE(button.input_state().hovered);
+        CHECK_FALSE(button.input_state().active);
+        CHECK_FALSE(button.input_state().focused);
+    }
+    REQUIRE(clicks == 0);
+    button.set_enabled(true);
+    REQUIRE(button.style_type() != ui::StyleType::DISABLED);
+    REQUIRE(button.accepts_input());
+}
+
 TEST_CASE("sdl cursor changes replace the native cursor and repeated requests reuse it", "[cursor][regression]") {
     SdlVideoSession sdl({128.0F, 128.0F});
     ui::SdlBackend backend(sdl.window(), sdl.context());

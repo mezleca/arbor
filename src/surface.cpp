@@ -112,6 +112,8 @@ void Surface::initialize(bool enable_debugger) {
     const ImGuiContextScope scope(m_context);
 
     ImGuiIO& io = ImGui::GetIO();
+    // the surface applies the final cursor after drawing, platform updates would compete with it
+    io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
     io.Fonts->AddFontDefaultVector();

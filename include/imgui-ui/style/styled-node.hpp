@@ -45,7 +45,11 @@ namespace ui {
         }
 
         void set_visual_style(StyleType type) {
-            if (enabled() || type == StyleType::DISABLED) m_state.set_style(type);
+            if (type == StyleType::DISABLED) {
+                set_enabled(false);
+            } else if (enabled()) {
+                m_state.set_style(type);
+            }
         }
 
         void set_interaction_style(bool hovered, bool active, bool focused = false) {
