@@ -11,10 +11,26 @@ static BoxInsets nonnegative_insets(BoxInsets value) {
     return {std::max(0.0F, value.left), std::max(0.0F, value.top), std::max(0.0F, value.right), std::max(0.0F, value.bottom)};
 }
 
-Style& Style::font(ImFont* value) {
+Style& Style::font(FontReference value) {
     if (m_font == value) return *this;
 
     m_font = value;
+    notify_change(true);
+    return *this;
+}
+
+Style& Style::font_weight(std::optional<FontWeight> value) {
+    if (m_font_weight == value) return *this;
+
+    m_font_weight = value;
+    notify_change(true);
+    return *this;
+}
+
+Style& Style::font_slant(std::optional<FontSlant> value) {
+    if (m_font_slant == value) return *this;
+
+    m_font_slant = value;
     notify_change(true);
     return *this;
 }
@@ -275,12 +291,16 @@ Style& Style::scrollbar_grab_active_color(Color value, TransitionSpec transition
 }
 
 bool Style::lerp(Style& style, const Style& target, float dt) {
-    const ImFont* previous_font = style.m_font;
+    const FontReference previous_font = style.m_font;
+    const auto previous_font_weight = style.m_font_weight;
+    const auto previous_font_slant = style.m_font_slant;
     const float previous_font_size = style.m_font_size;
     const BoxSizing previous_box_sizing = style.m_box_sizing;
     const LayoutSize previous_size = style.m_size;
 
     style.m_font = target.m_font;
+    style.m_font_weight = target.m_font_weight;
+    style.m_font_slant = target.m_font_slant;
     style.m_font_size = target.m_font_size;
     style.m_box_sizing = target.m_box_sizing;
     style.m_overflow = target.m_overflow;
@@ -343,7 +363,8 @@ bool Style::lerp(Style& style, const Style& target, float dt) {
         );
     }
 
-    const bool font_changed = previous_font != style.m_font || previous_font_size != style.m_font_size;
+    const bool font_changed = previous_font != style.m_font || previous_font_size != style.m_font_size ||
+                              previous_font_weight != style.m_font_weight || previous_font_slant != style.m_font_slant;
     if (font_changed || previous_box_sizing != style.m_box_sizing || measure_changed) {
         style.notify_change(font_changed);
     }

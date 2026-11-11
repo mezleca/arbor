@@ -44,6 +44,7 @@ namespace ui {
         void render();
 
         void set_style(const ImGuiStyle& style);
+        using StyledNode::set_font;
         void set_font(std::string_view id, int size);
         void set_hotkey(ImGuiKeyChord hotkey);
 
@@ -89,8 +90,6 @@ namespace ui {
         void apply_theme_defaults(const Theme& theme) override;
 
         Surface& m_target;
-        ImFont* m_font = nullptr;
-        float m_font_size = 0.0F;
         Texture* m_inspect_icon = nullptr;
         Texture* m_close_icon = nullptr;
         Rect m_highlight{};

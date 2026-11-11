@@ -116,13 +116,13 @@ ContextMenuWidget::ContextMenuWidget(ContextMenuItems items, TextureHandle subme
 
 void ContextMenuWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
     set_spacing(0.0F);
     if (m_submenu_icon == nullptr) {
         set_submenu_icon(surface().runtime().textures().find("context-menu-chevron"));
     }
     configure_all_styles([&theme](Style& style) {
-        style.padding({4.0F, 4.0F})
+        style.font_size(theme.controls.font_size)
+            .padding({4.0f, 4.0f})
             .background_color(theme.background_secondary_color)
             .border(BorderEdge{theme.controls.border_thickness, BorderType::Solid})
             .border_radius(theme.metrics.popup_rounding)

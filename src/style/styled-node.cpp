@@ -82,31 +82,35 @@ void StyledNode::surface_changed() {
     m_font_cache_valid = false;
 }
 
-StyledNode& StyledNode::set_font(ImFont* font, float size) {
+StyledNode& StyledNode::set_font(FontReference font, float size) {
     configure_all_styles([font, size](Style& style) { style.font(font).font_size(size); });
     return *this;
 }
 
 ImFont* StyledNode::font() const {
-    const ComputedStyle& current_style = computed_style();
-    if (current_style.font() != nullptr) return current_style.font();
-    if (m_font_cache_valid) return m_cached_font;
+    if (!m_font_cache_valid) {
+        // resolve the local style, then inherit each unset attribute from the nearest ancestor
+        const ComputedStyle& current = computed_style();
+        m_cached_font = current.font();
+        m_cached_font_weight = current.font_weight();
+        m_cached_font_slant = current.font_slant();
 
-    // cache the nearest ancestor's explicit font until attachment or font changes invalidate the subtree.
-    // the imgui fallback is not cached.
-    for (const Node* ancestor = parent(); ancestor != nullptr; ancestor = ancestor->parent()) {
-        const auto* styled_ancestor = dynamic_cast<const StyledNode*>(ancestor);
-        if (styled_ancestor == nullptr) continue;
+        for (const Node* ancestor = parent(); ancestor != nullptr; ancestor = ancestor->parent()) {
+            const auto* styled = dynamic_cast<const StyledNode*>(ancestor);
+            if (styled == nullptr) continue;
 
-        const ComputedStyle& ancestor_style = styled_ancestor->computed_style();
-        if (ancestor_style.font() != nullptr) {
-            m_cached_font = ancestor_style.font();
-            m_font_cache_valid = true;
-            return m_cached_font;
+            const ComputedStyle& inherited = styled->computed_style();
+            if (!m_cached_font) m_cached_font = inherited.font();
+            if (!m_cached_font_weight) m_cached_font_weight = inherited.font_weight();
+            if (!m_cached_font_slant) m_cached_font_slant = inherited.font_slant();
+            if (m_cached_font && m_cached_font_weight && m_cached_font_slant) break;
         }
+        m_font_cache_valid = true;
     }
 
-    return ImGui::GetFont();
+    // resolve per context, leaving imgui's current font uncached for native scopes
+    ImFont* resolved = m_cached_font.resolve(m_cached_font_weight, m_cached_font_slant);
+    return resolved != nullptr ? resolved : ImGui::GetFont();
 }
 
 float StyledNode::font_size() const {

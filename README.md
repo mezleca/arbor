@@ -18,6 +18,7 @@ while keeping full compatibility with imgui internals.
 - **Dear ImGui ≥ 1.92.8** (bundled: 1.93.0)
 - **CMake ≥ 3.25**
 - **FreeType**
+- **Fontconfig ≥ 2.12** on Linux
 
 ## usage
 

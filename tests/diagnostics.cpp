@@ -50,8 +50,7 @@ static void render_test_effect(void* data, const ImDrawList*, const ImDrawCmd*, 
 static int draw_list_index(const ImDrawData& draw_data, std::string_view owner) {
     for (int index = 0; index < draw_data.CmdListsCount; ++index) {
         const ImDrawList* draw_list = draw_data.CmdLists[index];
-        if (draw_list != nullptr && draw_list->_OwnerName != nullptr &&
-            std::string_view{draw_list->_OwnerName}.find(owner) != std::string_view::npos) {
+        if (draw_list != nullptr && draw_list->_OwnerName != nullptr && std::string_view{draw_list->_OwnerName}.contains(owner)) {
             return index;
         }
     }
@@ -263,9 +262,9 @@ TEST_CASE("ui profiler records completed zones and frame metrics") {
     {
         std::ifstream report(profiler.output_path());
         const std::string contents{std::istreambuf_iterator<char>(report), {}};
-        REQUIRE(contents.find("latest.input_entry_checks = 7") != std::string::npos);
-        REQUIRE(contents.find("latest.gpu_render_ms = 1.25") != std::string::npos);
-        REQUIRE(contents.find("gpu_render.average_ms = 1.25") != std::string::npos);
+        REQUIRE(contents.contains("latest.input_entry_checks = 7"));
+        REQUIRE(contents.contains("latest.gpu_render_ms = 1.25"));
+        REQUIRE(contents.contains("gpu_render.average_ms = 1.25"));
     }
 
     std::filesystem::remove(profiler.output_path());

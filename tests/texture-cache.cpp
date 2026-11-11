@@ -263,15 +263,16 @@ TEST_CASE("texture cache handles failed loads without registering an entry", "[t
 
 TEST_CASE("cover cache remains bounded across a large scrolling workload", "[texture-cache]") {
     TextureCacheFixture fixture;
-    fixture.registry.set_cache_config({.cpu_budget_bytes = 64 * 16});
+    fixture.registry.set_cache_config({.cpu_budget_bytes = std::size_t{64} * 16});
     for (int page = 0; page < 100; ++page) {
         std::vector<TextureHandle> visible;
+        visible.reserve(12);
         for (int item = 0; item < 12; ++item) {
-            visible.push_back(fixture.registry.acquire(std::to_string(page * 12 + item), std::string_view{}));
+            visible.push_back(fixture.registry.acquire(std::to_string((page * 12) + item), std::string_view{}));
         }
         fixture.registry.collect();
         REQUIRE(fixture.registry.stats().referenced_count == 12);
-        REQUIRE(fixture.registry.stats().cpu_bytes <= 64 * 16);
+        REQUIRE(fixture.registry.stats().cpu_bytes <= std::size_t{64} * 16);
     }
     fixture.registry.set_cache_config({.cpu_budget_bytes = 0});
     fixture.registry.collect();

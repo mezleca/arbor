@@ -663,7 +663,7 @@ TEST_CASE("wrapped ellipsis truncates the last visible line", "[TextWidget][rend
     CHECK(count > 0);
     CHECK(count < whole_vertices);
 
-    const ImVec4 partial_next_line = {clip.x, clip.y, clip.z, clip.w + height * 0.5F};
+    const ImVec4 partial_next_line = {clip.x, clip.y, clip.z, clip.w + (height * 0.5f)};
     const int partial_start = draw_list->VtxBuffer.Size;
     Painter(*draw_list).text_ellipsis(position, rgb(1, 1, 1), text, partial_next_line);
     CHECK(draw_list->VtxBuffer.Size - partial_start == count);

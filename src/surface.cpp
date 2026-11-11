@@ -95,6 +95,7 @@ ImFont* Surface::get_primary_font() const {
 void Surface::set_primary_font(Font* font) {
     const ImGuiContextScope scope(m_context);
     m_primary_font = font;
+    m_root->configure_all_styles([font](Style& style) { style.font(font); });
     ImFont* resolved = font != nullptr ? font->get() : nullptr;
     ImGui::GetIO().FontDefault = resolved;
 }

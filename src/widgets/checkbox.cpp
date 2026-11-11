@@ -27,12 +27,13 @@ CheckboxWidget::CheckboxWidget(WidgetValue<bool> value, std::string label, Label
 
 void CheckboxWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
     set_spacing(m_label_placement == LabelPlacement::Inline ? m_label_spacing.x : m_label_spacing.y);
     m_label_node->configure_all_styles([&theme](Style& style) { style.color(theme.text_color).padding({0.0F, 2.0F}); });
 
-    configure_all_styles([&theme](Style& style) { style.color(theme.text_color).padding({4.0F, 4.0F}); });
+    configure_all_styles([&theme](Style& style) {
+        style.color(theme.text_color).font_size(theme.controls.font_size).padding({4.0f, 4.0f});
+    });
 
     m_frame_border_thickness = theme.controls.border_thickness;
     m_rounding = theme.controls.rounding;

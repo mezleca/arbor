@@ -22,6 +22,8 @@ endfunction()
 # core must build without opengl. compile these effect implementations into each enabled backend instead.
 file(GLOB_RECURSE IMGUI_UI_CORE_SOURCES CONFIGURE_DEPENDS "*.cpp")
 list(FILTER IMGUI_UI_CORE_SOURCES EXCLUDE REGEX "/backends/")
+list(FILTER IMGUI_UI_CORE_SOURCES EXCLUDE REGEX "/resources/fonts/(linux|windows|unsupported)\\.cpp$")
+list(APPEND IMGUI_UI_CORE_SOURCES "resources/fonts/${IMGUI_UI_FONT_PLATFORM}.cpp")
 
 file(GLOB_RECURSE IMGUI_UI_OPENGL_EFFECT_SOURCES CONFIGURE_DEPENDS "imgui/effects/opengl*.cpp")
 list(REMOVE_ITEM IMGUI_UI_CORE_SOURCES ${IMGUI_UI_OPENGL_EFFECT_SOURCES})
@@ -46,6 +48,17 @@ target_include_directories(imgui-ui-core
 )
 target_link_libraries(imgui-ui-core PUBLIC imgui-ui::imgui)
 target_link_libraries(imgui-ui-core PRIVATE imgui-ui::nfd)
+
+if(MSVC)
+    target_compile_options(imgui-ui-core PRIVATE /utf-8)
+endif()
+
+if(IMGUI_UI_FONT_PLATFORM STREQUAL "linux")
+    find_package(Fontconfig 2.12 REQUIRED)
+    target_link_libraries(imgui-ui-core PRIVATE Fontconfig::Fontconfig)
+elseif(IMGUI_UI_FONT_PLATFORM STREQUAL "windows")
+    target_link_libraries(imgui-ui-core PRIVATE dwrite user32)
+endif()
 
 if(WIN32)
     target_compile_definitions(imgui-ui-core PRIVATE

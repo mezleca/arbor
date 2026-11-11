@@ -42,6 +42,8 @@ namespace ui {
         using ComputedStyle::cursor;
         using ComputedStyle::font;
         using ComputedStyle::font_size;
+        using ComputedStyle::font_slant;
+        using ComputedStyle::font_weight;
         using ComputedStyle::line_height;
         using ComputedStyle::margin;
         using ComputedStyle::overflow;
@@ -61,8 +63,11 @@ namespace ui {
 
         Style() = default;
 
-        Style& font(ImFont* value);
+        Style& font(FontReference value);
         Style& font_size(float value);
+        /// nullopt restores inheritance for each attribute
+        Style& font_weight(std::optional<FontWeight> value);
+        Style& font_slant(std::optional<FontSlant> value);
 
         StyleVariableStore& variables() {
             return m_vars;

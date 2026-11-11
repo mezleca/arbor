@@ -77,8 +77,8 @@ bool TextWidget::paint() {
     const Rect content = content_rect(outer);
     const ImVec2 text_size = m_text.text_size();
     const ImVec2 position = {
-        content.min.x + std::max(0.0f, content.size().x - text_size.x) * m_alignment.x,
-        content.min.y + std::max(0.0f, content.size().y - text_size.y) * m_alignment.y,
+        content.min.x + (std::max(0.0f, content.size().x - text_size.x) * m_alignment.x),
+        content.min.y + (std::max(0.0f, content.size().y - text_size.y) * m_alignment.y),
     };
 
     const Painter paint = painter();

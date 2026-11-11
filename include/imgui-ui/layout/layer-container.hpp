@@ -51,7 +51,7 @@ namespace ui {
         bool paint_popup();
         void prepare_window(ImVec2 position, ImVec2 size, ImGuiWindowFlags flags, bool popup);
         void paint_window_contents();
-        void finish_popup(bool open);
+        static void finish_popup(bool open);
 
         LayerMode m_mode;
         ImVec2 m_popup_position;

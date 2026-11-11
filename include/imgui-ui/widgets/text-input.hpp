@@ -117,7 +117,7 @@ namespace ui {
         void* m_callback_data = nullptr;
         TextSelection m_selection;
         LabelPlacement m_label_placement = LabelPlacement::Inline;
-        ImVec2 m_label_spacing{};
+        ImVec2 m_label_spacing;
         ImGuiInputTextFlags m_flags = ImGuiInputTextFlags_None;
         TextSubmitMode m_submit_mode = TextSubmitMode::CtrlEnter;
         int m_minimum_rows = 3;

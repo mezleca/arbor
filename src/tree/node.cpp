@@ -90,6 +90,11 @@ Node& Node::set_anchor(ImVec2 anchor, ImVec2 origin) {
 
 Node::~Node() {
     if (m_input_router != nullptr) m_input_router->detach(*this);
+
+    // children must not propagate input state into a parent's partially destroyed child list
+    for (const auto& child : m_children) {
+        child->m_parent = nullptr;
+    }
 }
 
 void Node::set_input_state(InputState state) {
@@ -523,6 +528,7 @@ void Node::update(float dt) {
 
 void Node::apply_theme(const Theme& theme) {
     apply_theme_defaults(theme);
+    invalidate_measure();
     for (const auto& child : m_children) {
         if (!child->m_removal_pending) {
             child->apply_theme(theme);

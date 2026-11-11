@@ -35,8 +35,9 @@ FileDialogWidget::FileDialogWidget(std::string label, LabelPlacement placement, 
 
 void FileDialogWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
-    configure_all_styles([](Style& style) { style.padding({}).border(BorderEdge{0.0F, BorderType::None}); });
+    configure_all_styles([&theme](Style& style) {
+        style.font_size(theme.controls.font_size).padding({}).border(BorderEdge{0.0f, BorderType::None});
+    });
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
     update_label_layout();
 }

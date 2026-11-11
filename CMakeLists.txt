@@ -12,6 +12,14 @@ option(IMGUI_UI_BUILD_TESTS "build the framework tests" ${PROJECT_IS_TOP_LEVEL})
 option(IMGUI_UI_BUILD_EXAMPLES "build the selected backend examples" OFF)
 option(IMGUI_UI_ENABLE_SANITIZERS "enable sanitizers in debug builds" OFF)
 
+if(WIN32)
+    set(IMGUI_UI_FONT_PLATFORM windows)
+elseif(UNIX AND NOT APPLE AND NOT ANDROID)
+    set(IMGUI_UI_FONT_PLATFORM linux)
+else()
+    set(IMGUI_UI_FONT_PLATFORM unsupported)
+endif()
+
 set(IMGUI_UI_IMGUI_DIR "" CACHE PATH "imgui source directory, empty uses vendor/imgui")
 
 include(cmake/sanitizers.cmake)

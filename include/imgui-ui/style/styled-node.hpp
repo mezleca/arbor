@@ -125,7 +125,7 @@ namespace ui {
         void remove_after();
 
         /// remeasures descendants because they may inherit this font.
-        StyledNode& set_font(ImFont* font, float size = 0.0F);
+        StyledNode& set_font(FontReference font, float size = 0.0f);
 
         /// resolves the local font, then the closest styled ancestor, then imgui's font.
         ImFont* font() const;
@@ -181,7 +181,9 @@ namespace ui {
         std::string_view m_type_name;
         std::unique_ptr<PaintSlot> m_before;
         std::unique_ptr<PaintSlot> m_after;
-        mutable ImFont* m_cached_font = nullptr;
+        mutable FontReference m_cached_font;
+        mutable std::optional<FontWeight> m_cached_font_weight;
+        mutable std::optional<FontSlant> m_cached_font_slant;
         mutable bool m_font_cache_valid = false;
         std::function<void()> m_tooltip_callback;
         std::string m_tooltip_text;

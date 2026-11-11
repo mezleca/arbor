@@ -37,7 +37,7 @@ namespace ui {
 
         mutable TextValue m_text;
         TextOverflow m_overflow = TextOverflow::Clip;
-        ImVec2 m_alignment{};
+        ImVec2 m_alignment;
         bool m_wrap_available = false;
     };
 

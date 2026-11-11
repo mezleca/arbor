@@ -362,9 +362,9 @@ protected:
 
     void apply_theme_defaults(const Theme& theme) override {
         LayerContainer::apply_theme_defaults(theme);
-        set_font(surface().get_primary_font(), 16.0F);
         configure_all_styles([&theme](Style& style) {
-            style.background_color(theme.background_secondary_color)
+            style.font_size(16.0f)
+                .background_color(theme.background_secondary_color)
                 .padding({14.0F, 14.0F})
                 .border(BorderEdge{1.0F, BorderType::Solid})
                 .border_color(theme.accent_color)
@@ -449,10 +449,10 @@ public:
 
 protected:
     void apply_theme_defaults(const Theme& theme) override {
-        set_font(surface().get_primary_font(), 14.0F);
         m_fill_color = theme.accent_color;
         configure_all_styles([&theme](Style& style) {
-            style.color(theme.text_color)
+            style.font_size(14.0f)
+                .color(theme.text_color)
                 .background_color(theme.background_tertiary_color)
                 .border(BorderEdge{1.0F, BorderType::Solid})
                 .border_color(theme.border_color)
@@ -1017,6 +1017,8 @@ void DemoScreen::setup_text(Container& widgets) {
     auto& text = widgets.add<TreeContainer>("Text overflow & animation");
     text.set_spacing(8.0F);
     text.add<DemoAnimatedText>("hover for cool animation");
+    text.add<TextWidget>("Light font weight").style().font_weight(FontWeight::Light);
+    text.add<TextWidget>("Bold font weight").style().font_weight(FontWeight::Bold);
 
     text.add<TextWidget>("ellipsis: this text is longer than the available width")
         .set_overflow(TextOverflow::Ellipsis)

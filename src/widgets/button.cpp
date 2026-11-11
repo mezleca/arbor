@@ -14,8 +14,9 @@ ButtonWidget::ButtonWidget(std::string text, LayoutSize size) : Widget({}, "Butt
 
 void ButtonWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
-    configure_all_styles([&theme](Style& style) { style.control(theme).cursor(ImGuiMouseCursor_Hand); });
+    configure_all_styles([&theme](Style& style) {
+        style.control(theme).font_size(theme.controls.font_size).cursor(ImGuiMouseCursor_Hand);
+    });
 
     style(StyleType::ACTIVE).background_color(theme.controls.active_color).border_color(theme.accent_color, 0.2F);
     style(StyleType::FOCUS).border_color(theme.accent_color);

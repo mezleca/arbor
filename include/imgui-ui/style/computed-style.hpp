@@ -4,6 +4,7 @@
 #include "variables.hpp"
 #include "../layout/geometry.hpp"
 #include "../transition.hpp"
+#include "../resources/font-registry.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -70,8 +71,16 @@ namespace ui {
     public:
         ComputedStyle();
 
-        ImFont* font() const {
+        FontReference font() const {
             return m_font;
+        }
+
+        std::optional<FontWeight> font_weight() const {
+            return m_font_weight;
+        }
+
+        std::optional<FontSlant> font_slant() const {
+            return m_font_slant;
         }
 
         float font_size() const {
@@ -222,7 +231,9 @@ namespace ui {
 
         friend class StyledNode;
 
-        ImFont* m_font = nullptr;
+        FontReference m_font;
+        std::optional<FontWeight> m_font_weight;
+        std::optional<FontSlant> m_font_slant;
         float m_font_size = 0.0F;
         Value<BoxInsets> m_margin;
         Value<BoxInsets> m_padding;

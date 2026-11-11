@@ -173,7 +173,6 @@ void TextInputWidget::event(UiEvent& event) {
 
 void TextInputWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
     const TransitionSpec transition{0.25F, easing::out_quad};
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
     set_label_layout(m_label_placement, m_label_spacing);
@@ -183,7 +182,9 @@ void TextInputWidget::apply_theme_defaults(const Theme& theme) {
     m_icon_node->set_size({px(18.0F), px(18.0F)});
     m_field_node->set_size({grow(), grow()});
 
-    configure_all_styles([](Style& style) { style.padding({}).border(BorderEdge{0.0F, BorderType::None}); });
+    configure_all_styles([&theme](Style& style) {
+        style.font_size(theme.controls.font_size).padding({}).border(BorderEdge{0.0f, BorderType::None});
+    });
 
     m_input_node->configure_all_styles([&theme, transition](Style& style) { style.control(theme, transition); });
 

@@ -3,8 +3,10 @@
 #include "widget.hpp"
 #include "text.hpp"
 #include "value.hpp"
+#include "../surface.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <concepts>
 #include <cstdint>
 #include <optional>
@@ -189,14 +191,15 @@ namespace ui {
     void NumberInputWidget<T>::apply_theme_defaults(const Theme& theme) {
         Container::apply_theme_defaults(theme);
         const TransitionSpec transition{0.25F, easing::out_quad};
-        set_font(surface().get_primary_font(), theme.controls.font_size);
 
         m_thumb_color = theme.controls.mark_color;
         m_thumb_size = theme.controls.thumb_size;
         m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
 
         update_label_layout();
-        configure_all_styles([](Style& style) { style.padding({}).border(BorderEdge{0.0F, BorderType::None}); });
+        configure_all_styles([&theme](Style& style) {
+            style.font_size(theme.controls.font_size).padding({}).border(BorderEdge{0.0f, BorderType::None});
+        });
 
         m_field->configure_all_styles([&theme, transition](Style& style) { style.control(theme, transition); });
         m_field->style(StyleType::HOVER).background_color(theme.controls.hover_color, transition);

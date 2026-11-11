@@ -351,7 +351,6 @@ ColorPickerWidget& ColorPickerWidget::set_label(std::string label, LabelPlacemen
 
 void ColorPickerWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
     set_label_layout(m_label_placement, m_label_spacing);
 
@@ -363,7 +362,7 @@ void ColorPickerWidget::apply_theme_defaults(const Theme& theme) {
     set_size({fit(), fit()});
     m_preview->set_size({px(preview_size.x), px(preview_size.y)});
 
-    configure_all_styles([](Style& style) { style.padding({}); });
+    configure_all_styles([&theme](Style& style) { style.font_size(theme.controls.font_size).padding({}); });
 
     m_label_node->configure_all_styles([&theme](Style& style) { style.color(theme.text_color); });
     m_preview->configure_all_styles([&theme](Style& style) {

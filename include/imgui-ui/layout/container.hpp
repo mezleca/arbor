@@ -68,7 +68,7 @@ namespace ui {
 
         void on_measure() override;
         ImVec2 measure_children(
-            ImVec2 available = {std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity()},
+            ImVec2 content_size = {std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity()},
             bool intrinsic = true
         ) const;
         virtual ImVec2 measure_content(ImVec2 available) const;
@@ -95,7 +95,7 @@ namespace ui {
         }
 
     private:
-        void measure_item(LayoutItem& item, ImVec2 available) const;
+        static void measure_item(LayoutItem& item, ImVec2 available);
         void resolve_line(LayoutLine& line, ImVec2 available, bool intrinsic) const;
 
         Scroll m_scroll;

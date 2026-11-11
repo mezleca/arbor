@@ -325,10 +325,10 @@ void DropdownWidget::event(UiEvent& event) {
 
 void DropdownWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
-    set_font(surface().get_primary_font(), theme.controls.font_size);
 
     configure_all_styles([&theme](Style& style) {
-        style.color(theme.text_color)
+        style.font_size(theme.controls.font_size)
+            .color(theme.text_color)
             .background_color(theme.transparent)
             .border_color(theme.controls.border_color)
             .border(BorderEdge{0.0F, BorderType::None})

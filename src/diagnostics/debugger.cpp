@@ -595,8 +595,7 @@ void Debugger::set_font(std::string_view id, int size) {
         return;
     }
 
-    m_font = m_target.get_font(id);
-    m_font_size = static_cast<float>(size);
+    StyledNode::set_font(m_target.runtime().fonts().find(id), static_cast<float>(size));
 }
 
 bool Debugger::overlay_contains(ImVec2 position) const {
@@ -1118,10 +1117,15 @@ void Debugger::render_layout_properties() {
         LayoutAxis& axis = width ? size.width : size.height;
         const float resolved = width ? layout.size().x : layout.size().y;
         axis.mode = mode;
-        axis.value = mode == LayoutSizeMode::Fixed     ? resolved
-                     : mode == LayoutSizeMode::Percent ? 100.0F
-                     : mode == LayoutSizeMode::Grow    ? 1.0F
-                                                       : 0.0F;
+        if (mode == LayoutSizeMode::Fixed) {
+            axis.value = resolved;
+        } else if (mode == LayoutSizeMode::Percent) {
+            axis.value = 100.0f;
+        } else if (mode == LayoutSizeMode::Grow) {
+            axis.value = 1.0f;
+        } else {
+            axis.value = 0.0f;
+        }
         m_node_target->set_size(size);
     };
 
@@ -1647,11 +1651,6 @@ void Debugger::render() {
     update_overlay_focus(ImGui::GetMousePos());
     draw_highlight();
 
-    const bool has_font = m_font != nullptr;
-    if (has_font) {
-        ImGui::PushFont(m_font, m_font_size);
-    }
-
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, {ITEM_SPACING, 4.0F});
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {6.0F, 4.0F});
     render_toolbar();
@@ -1691,10 +1690,6 @@ void Debugger::render() {
 
     render_sections();
     ImGui::PopStyleVar(2);
-
-    if (has_font) {
-        ImGui::PopFont();
-    }
 
     if (debugger_window != nullptr) {
         bring_debugger_to_front(*debugger_window);

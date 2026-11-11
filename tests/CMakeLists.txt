@@ -6,12 +6,21 @@ add_executable(imgui-ui-tests
     layout.cpp
     widgets.cpp
     texture-cache.cpp
+    fonts.cpp
     imgui-context.hpp
 )
 
 target_link_libraries(imgui-ui-tests PRIVATE imgui-ui::core Catch2::Catch2WithMain)
 target_compile_definitions(imgui-ui-tests PRIVATE IMGUI_UI_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets")
 target_precompile_headers(imgui-ui-tests PRIVATE <catch2/catch_test_macros.hpp> <imgui.h>)
+
+if(MSVC)
+    target_compile_options(imgui-ui-tests PRIVATE /utf-8)
+endif()
+
+if(NOT IMGUI_UI_FONT_PLATFORM STREQUAL "unsupported")
+    target_compile_definitions(imgui-ui-tests PRIVATE IMGUI_UI_TEST_NATIVE_FONTS)
+endif()
 
 include(Catch)
 catch_discover_tests(imgui-ui-tests DISCOVERY_MODE PRE_TEST)

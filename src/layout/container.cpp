@@ -119,7 +119,7 @@ ImVec2 Container::measure_size(ImVec2 allocation) const {
     return measured;
 }
 
-void Container::measure_item(LayoutItem& item, ImVec2 available) const {
+void Container::measure_item(LayoutItem& item, ImVec2 available) {
     const NodeLayout& layout = item.node->layout();
     const ImVec2 measured = item.node->measure_size(item.size);
     item.preferred = layout.intrinsic_size(measured);
@@ -283,7 +283,7 @@ void Container::arrange_children(ImVec2 content_size) {
             }
             offset[main] += cursor;
             offset[cross] +=
-                cross_cursor + (cross_size - item.size[cross] - item.margin.axis(cross == 0)) * m_content_alignment[cross];
+                cross_cursor + ((cross_size - item.size[cross] - item.margin.axis(cross == 0)) * m_content_alignment[cross]);
             if (m_wrap == StackWrap::WrapReverse) {
                 offset[cross] = content_size[cross] - offset[cross] - item.size[cross];
             }
