@@ -124,7 +124,12 @@ std::vector<std::string> ui::system_font_preferences(std::string_view language) 
     }
 
     FcConfigSubstitute(config.get(), pattern.get(), FcMatchPattern);
+    // newer fontconfig defaults must use our owned config instead of initializing a second global one.
+#if FC_VERSION >= 21700
+    FcConfigSetDefaultSubstitute(config.get(), pattern.get());
+#else
     FcDefaultSubstitute(pattern.get());
+#endif
 
     FcResult status;
     // trim drops fonts that do not match the pattern
