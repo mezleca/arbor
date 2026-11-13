@@ -1,4 +1,4 @@
-#include <imgui-ui/resources/font-registry.hpp>
+#include <arbor/resources/font-registry.hpp>
 #include "fonts/platform.hpp"
 
 #include <ft2build.h>

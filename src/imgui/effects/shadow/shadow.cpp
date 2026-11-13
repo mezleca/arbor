@@ -1,6 +1,6 @@
-#include <imgui-ui/imgui/effects/shadow/shadow.hpp>
+#include <arbor/imgui/effects/shadow/shadow.hpp>
 
-#include <imgui-ui/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/effects.hpp>
 
 #include <algorithm>
 #include <cmath>

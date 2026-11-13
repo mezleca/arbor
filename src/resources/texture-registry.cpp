@@ -1,5 +1,5 @@
-#include <imgui-ui/resources/texture-registry.hpp>
-#include <imgui-ui/resources/svg.hpp>
+#include <arbor/resources/texture-registry.hpp>
+#include <arbor/resources/svg.hpp>
 
 #include <utility>
 #include <algorithm>
@@ -60,14 +60,14 @@ TextureHandle TextureRegistry::load_asset(std::string id, Source&& source, Textu
         return existing;
     }
     if (!m_loader) {
-        std::cerr << "imgui-ui: cannot load texture '" << id << "' without a TextureLoader\n";
+        std::cerr << "arbor: cannot load texture '" << id << "' without a TextureLoader\n";
         return {};
     }
     try {
         auto texture = m_loader->load(std::forward<Source>(source), id);
         return store(std::move(id), std::move(texture), retention);
     } catch (const std::runtime_error& error) {
-        std::cerr << "imgui-ui: cannot load texture '" << id << "': " << error.what() << '\n';
+        std::cerr << "arbor: cannot load texture '" << id << "': " << error.what() << '\n';
         return {};
     }
 }

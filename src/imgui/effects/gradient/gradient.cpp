@@ -1,6 +1,6 @@
-#include <imgui-ui/imgui/effects/gradient/gradient.hpp>
+#include <arbor/imgui/effects/gradient/gradient.hpp>
 
-#include <imgui-ui/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/effects.hpp>
 
 #include <algorithm>
 

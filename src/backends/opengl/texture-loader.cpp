@@ -1,4 +1,4 @@
-#include <imgui-ui/backends/opengl/texture-loader.hpp>
+#include <arbor/backends/opengl/texture-loader.hpp>
 
 #include <glad/gl.h>
 #include <lunasvg.h>
@@ -8,6 +8,8 @@ extern "C" {
 #include <nsgif.h>
 }
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -125,8 +127,9 @@ public:
             return {};
         }
 
-        const int width = static_cast<int>(size.x);
-        const int height = static_cast<int>(size.y);
+        const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
+        const int width = std::max(1, static_cast<int>(std::ceil(size.x * density.x)));
+        const int height = std::max(1, static_cast<int>(std::ceil(size.y * density.y)));
         const uint64_t size_key = (static_cast<uint64_t>(static_cast<uint32_t>(width)) << 32U) | static_cast<uint32_t>(height);
         auto& cache = m_textures[context];
         const auto existing = cache.find(size_key);

@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/input/router.hpp>
-#include <imgui-ui/widgets/file-dialog.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/input/router.hpp>
+#include <arbor/widgets/file-dialog.hpp>
 
 #include "imgui-context.hpp"
 

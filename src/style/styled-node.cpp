@@ -1,9 +1,9 @@
-#include <imgui-ui/style/styled-node.hpp>
+#include <arbor/style/styled-node.hpp>
 
-#include <imgui-ui/style/paint-slot.hpp>
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/style/paint-slot.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/surface.hpp>
 
 #include <imgui_internal.h>
 
@@ -74,7 +74,7 @@ void StyledNode::advance_size_transition(float dt) {
         return;
     }
 
-    apply_size_spec({px(m_animated_size.value.x), px(m_animated_size.value.y)});
+    apply_size_spec({px(m_animated_size.value.x / dpi_scale()), px(m_animated_size.value.y / dpi_scale())});
     invalidate_measure();
 }
 
@@ -87,26 +87,33 @@ StyledNode& StyledNode::set_font(FontReference font, float size) {
     return *this;
 }
 
-ImFont* StyledNode::font() const {
-    if (!m_font_cache_valid) {
-        // resolve the local style, then inherit each unset attribute from the nearest ancestor
-        const ComputedStyle& current = computed_style();
-        m_cached_font = current.font();
-        m_cached_font_weight = current.font_weight();
-        m_cached_font_slant = current.font_slant();
+void StyledNode::update_font_cache() const {
+    if (m_font_cache_valid) return;
 
-        for (const Node* ancestor = parent(); ancestor != nullptr; ancestor = ancestor->parent()) {
-            const auto* styled = dynamic_cast<const StyledNode*>(ancestor);
-            if (styled == nullptr) continue;
+    // inherit attributes without loading font data, so size-only queries remain cheap.
+    const ComputedStyle& current = computed_style();
+    m_cached_font = current.font();
+    m_cached_font_weight = current.font_weight();
+    m_cached_font_slant = current.font_slant();
+    m_cached_font_size = current.font_size();
 
-            const ComputedStyle& inherited = styled->computed_style();
-            if (!m_cached_font) m_cached_font = inherited.font();
-            if (!m_cached_font_weight) m_cached_font_weight = inherited.font_weight();
-            if (!m_cached_font_slant) m_cached_font_slant = inherited.font_slant();
-            if (m_cached_font && m_cached_font_weight && m_cached_font_slant) break;
-        }
-        m_font_cache_valid = true;
+    for (const Node* ancestor = parent(); ancestor != nullptr; ancestor = ancestor->parent()) {
+        const auto* styled = dynamic_cast<const StyledNode*>(ancestor);
+        if (styled == nullptr) continue;
+
+        // the nearest styled ancestor already resolves the rest of the chain, including unset attributes.
+        styled->update_font_cache();
+        if (!m_cached_font) m_cached_font = styled->m_cached_font;
+        if (!m_cached_font_weight) m_cached_font_weight = styled->m_cached_font_weight;
+        if (!m_cached_font_slant) m_cached_font_slant = styled->m_cached_font_slant;
+        if (m_cached_font_size <= 0.0f) m_cached_font_size = styled->m_cached_font_size;
+        break;
     }
+    m_font_cache_valid = true;
+}
+
+ImFont* StyledNode::font() const {
+    update_font_cache();
 
     // resolve per context, leaving imgui's current font uncached for native scopes
     ImFont* resolved = m_cached_font.resolve(m_cached_font_weight, m_cached_font_slant);
@@ -114,20 +121,14 @@ ImFont* StyledNode::font() const {
 }
 
 float StyledNode::font_size() const {
-    if (computed_style().font_size() > 0.0F) return computed_style().font_size();
-
-    for (const Node* ancestor = parent(); ancestor != nullptr; ancestor = ancestor->parent()) {
-        const auto* styled = dynamic_cast<const StyledNode*>(ancestor);
-        if (styled != nullptr && styled->computed_style().font_size() > 0.0F) return styled->computed_style().font_size();
-    }
-
-    return font()->LegacySize;
+    update_font_cache();
+    return m_cached_font_size > 0.0f ? m_cached_font_size : font()->LegacySize;
 }
 
 BoxInsets StyledNode::box_insets() const {
     const ComputedStyle& style = computed_style();
-    const BoxInsets padding = style.padding();
-    const BoxInsets border = style.border_widths();
+    const BoxInsets padding = style.padding() * dpi_scale();
+    const BoxInsets border = style.border_widths() * dpi_scale();
     return {
         padding.left + border.left,
         padding.top + border.top,
@@ -162,7 +163,8 @@ Painter StyledNode::painter() const {
 }
 
 void StyledNode::draw_surface(Rect rect, const std::optional<Color>& background) const {
-    painter().frame(rect, computed_style(), background);
+    const Painter paint = painter();
+    paint.frame(paint.to_logical(rect), computed_style(), background);
 }
 
 PaintSlot& StyledNode::before() {
@@ -194,6 +196,8 @@ void StyledNode::draw() {
         return;
     }
 
+    // layers have not begun their window yet. reading must not activate imgui's implicit fallback window.
+    paint_state().apply_clip(*ImGui::GetCurrentWindowRead()->DrawList, effect_registry());
     const bool is_disabled = !enabled();
     if (!is_disabled) update_cursor();
     const ComputedStyle& current_style = computed_style();
@@ -350,9 +354,12 @@ void StyledNode::draw_after() {
     if (!m_tooltip_callback && m_tooltip_text.empty()) return;
 
     const Theme& theme = surface().theme();
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, theme.metrics.window_padding);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme.metrics.popup_rounding);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, theme.controls.border_thickness);
+    const float scale = dpi_scale();
+    ImGui::PushStyleVar(
+        ImGuiStyleVar_WindowPadding, ImVec2{theme.metrics.window_padding.x * scale, theme.metrics.window_padding.y * scale}
+    );
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme.metrics.popup_rounding * scale);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, theme.controls.border_thickness * scale);
     ImGui::PushStyleColor(ImGuiCol_PopupBg, theme.controls.background_color.rgba());
     ImGui::PushStyleColor(ImGuiCol_Border, theme.controls.border_color.rgba());
 
@@ -371,6 +378,6 @@ void StyledNode::draw_after() {
 
 void StyledNode::draw_slot(PaintSlot& slot, ImDrawList& draw_list) {
     const Rect rect = layout().visual_rect();
-    const Painter painter(draw_list, &paint_state(), effect_registry(), slot.m_opacity * slot.m_style.alpha());
+    const Painter painter(draw_list, &paint_state(), effect_registry(), slot.m_style.alpha());
     slot.paint(painter, rect, content_rect(rect));
 }

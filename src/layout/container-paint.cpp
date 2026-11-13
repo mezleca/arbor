@@ -1,9 +1,9 @@
-#include <imgui-ui/layout/container.hpp>
+#include <arbor/layout/container.hpp>
 
-#include <imgui-ui/constants.hpp>
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/imgui/paint-state.hpp>
-#include <imgui-ui/imgui/window.hpp>
+#include <arbor/constants.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/imgui/paint-state.hpp>
+#include <arbor/imgui/window.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -18,7 +18,7 @@ static ImVec4 current_clip(const ImDrawList& draw_list) {
 }
 
 static ImVec4 content_clip(const ComputedStyle& style, Rect rect) {
-    const BoxInsets widths = style.border_widths();
+    const BoxInsets widths = style.border_widths() * dpi_scale();
     rect.min.x += widths.left;
     rect.min.y += widths.top;
     if (widths.right > 0.0F) rect.max.x -= widths.right + 1.0F;
@@ -91,13 +91,13 @@ bool Container::paint() {
     if (effects != nullptr && (current_style.blur() > 0 || current_style.box_shadow().color.max_alpha() > 0.0F)) {
         const ImRect blur_rect = ImGui::GetCurrentWindow()->InnerRect;
         ImGui::PushClipRect({parent_effect_clip.x, parent_effect_clip.y}, {parent_effect_clip.z, parent_effect_clip.w}, false);
-        paint.blur({blur_rect.Min, blur_rect.Max}, current_style);
-        paint.shadow(shadow_rect(resolved_child_rect), current_style);
+        paint.blur(paint.to_logical(Rect{blur_rect.Min, blur_rect.Max}), current_style);
+        paint.shadow(paint.to_logical(shadow_rect(resolved_child_rect)), current_style);
         ImGui::PopClipRect();
     }
 
-    // paint the frame with the parent clip before narrowing the clip for descendants.
-    ImGui::PushClipRect({parent_clip.x, parent_clip.y}, {parent_clip.z, parent_clip.w}, true);
+    // the child's inner clip can cut off its own border. replace it with the ancestor clip while painting the frame.
+    ImGui::PushClipRect({parent_clip.x, parent_clip.y}, {parent_clip.z, parent_clip.w}, false);
     const PaintContext paint_context{resolved_child_rect, content_rect(resolved_child_rect), paint, current_style};
     paint_surface(paint_context);
     ImGui::PopClipRect();

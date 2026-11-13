@@ -1,4 +1,5 @@
-#include <imgui-ui/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/imgui/paint-state.hpp>
 
 #include <imgui.h>
 
@@ -122,6 +123,10 @@ bool EffectRegistry::submit(ImDrawList& draw_list, uint32_t id, const void* comm
     std::memcpy(copied_command, command, size);
     QueuedCommand queued{entry->definition.render, entry->definition.user_data, copied_command};
     draw_list.AddCallback(render_command, &queued, sizeof(queued));
-    draw_list.AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+    if (id != m_slots[static_cast<std::size_t>(EffectSlot::Clip)].m_id) {
+        draw_list.AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+        // effect shaders replace imgui's program. restore the active rounded clip after the native reset.
+        effect(EffectSlot::Clip).submit(draw_list, ClipCommand{.restore = true});
+    }
     return true;
 }

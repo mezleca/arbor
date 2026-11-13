@@ -2,36 +2,103 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "imgui-context.hpp"
-#include <imgui-ui/imgui/border.hpp>
-#include <imgui-ui/imgui/effects/blur/blur.hpp>
-#include <imgui-ui/imgui/effects/effects.hpp>
-#include <imgui-ui/imgui/effects/shadow/shadow.hpp>
-#include <imgui-ui/style/gradient-data.hpp>
-#include <imgui-ui/style/tween/animator.hpp>
-#include <imgui-ui/layout/container.hpp>
-#include <imgui-ui/layout/geometry.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/layout/tree-container.hpp>
-#include <imgui-ui/resources/font-registry.hpp>
-#include <imgui-ui/tree/node.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/dropdown.hpp>
-#include <imgui-ui/widgets/widget.hpp>
+#include <arbor/imgui/border.hpp>
+#include <arbor/imgui/effects/blur/blur.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/shadow/shadow.hpp>
+#include <arbor/style/gradient-data.hpp>
+#include <arbor/style/tween/animator.hpp>
+#include <arbor/layout/container.hpp>
+#include <arbor/layout/geometry.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/layout/tree-container.hpp>
+#include <arbor/resources/font-registry.hpp>
+#include <arbor/tree/node.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/dropdown.hpp>
+#include <arbor/widgets/widget.hpp>
 
 #include <imgui_internal.h>
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <limits>
 #include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
 
 using namespace ui;
 
+class LifecycleWidget final : public Widget {
+public:
+    explicit LifecycleWidget(int* destructions = nullptr, std::function<void(Widget&)> update = {})
+        : Widget("lifecycle"), m_update(std::move(update)), m_destructions(destructions) {}
+
+    ~LifecycleWidget() override {
+        if (m_destructions != nullptr) ++*m_destructions;
+    }
+
+private:
+    void on_update(float) override {
+        if (m_update) m_update(*this);
+    }
+
+    std::function<void(Widget&)> m_update;
+    int* m_destructions;
+};
+
+TEST_CASE("surface scale preserves configured sizes and native coordinates", "[surface][scale]") {
+    Runtime runtime;
+    Surface surface(runtime, {.backend = std::make_unique<ui_test::TestBackend>(1.5f)});
+    const ImGuiContextScope context(surface.imgui_context());
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = {600.0f, 400.0f};
+    io.BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    auto& panel = surface.root().add<Container>("scaled");
+    panel.set_size({px(100.0f), px(40.0f)});
+    panel.style().padding({5.0f, 7.0f}).border_radius(9.0f);
+    panel.after().set_draw_callback([](const PaintContext& context) {
+        CHECK(context.rect.size().x == Catch::Approx(100.0f).margin(1.0f));
+        CHECK(context.rect.size().y == Catch::Approx(40.0f).margin(1.0f));
+        if (context.painter.alpha() == 0.0f) return;
+
+        ImDrawList& list = context.painter.draw_list();
+        // native glyph origins must remain pixel aligned after the logical position is scaled.
+        const int first = list.VtxBuffer.Size;
+        const ImVec2 position = {context.rect.min.x + 12.3f, context.rect.min.y + 12.7f};
+        context.painter.text(position, rgb(255, 255, 255), "I");
+        REQUIRE(list.VtxBuffer.Size == first + 4);
+        const ImFontGlyph* glyph = ImGui::GetFontBaked()->FindGlyph('I');
+        CHECK(list.VtxBuffer[first].pos.x - glyph->X0 == Catch::Approx(std::floor(context.painter.to_screen(position).x)));
+    });
+
+    for (float scale : {1.0f, 1.25f, 2.0f, 0.75f, 1.0f}) {
+        surface.set_scale(scale);
+        ui_test::draw_surface(surface);
+
+        CHECK(ImGui::GetStyle().FontScaleDpi == Catch::Approx(1.5f * scale));
+        CHECK(panel.layout().size().x == Catch::Approx(100.0f * 1.5f * scale));
+        CHECK(panel.layout().size().y == Catch::Approx(40.0f * 1.5f * scale));
+    }
+
+    CHECK(surface.scale() == 1.0f);
+    CHECK(io.DisplaySize.x == 600.0f);
+    CHECK(io.DisplayFramebufferScale.x == 1.0f);
+    CHECK(panel.layout().size_spec().width.value == 100.0f);
+    CHECK(panel.computed_style().padding().left == 5.0f);
+    CHECK(panel.computed_style().border_radius() == 9.0f);
+
+    CHECK_THROWS_AS(surface.set_scale(0.0f), std::invalid_argument);
+    CHECK_THROWS_AS(surface.set_scale(-1.0f), std::invalid_argument);
+    CHECK_THROWS_AS(surface.set_scale(std::numeric_limits<float>::infinity()), std::invalid_argument);
+    CHECK_THROWS_AS(surface.set_scale(std::numeric_limits<float>::quiet_NaN()), std::invalid_argument);
+}
+
 TEST_CASE("fonts load once per context and tolerate an empty origin", "[resources][cleanup]") {
     Font empty({}, ImFontConfig{});
-    Font font(std::string(IMGUI_UI_ASSETS_DIR) + "/fonts/Inter.ttf", ImFontConfig{});
+    Font font(std::string(ARBOR_ASSETS_DIR) + "/fonts/Inter.ttf", ImFontConfig{});
     ::ImGuiContext* previous = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(nullptr);
     CHECK(empty.get() == nullptr);
@@ -57,7 +124,7 @@ TEST_CASE("fonts load once per context and tolerate an empty origin", "[resource
 
 TEST_CASE("surface primary font replaces the embedded fallback for text", "[resources][font][regression]") {
     Runtime runtime;
-    Font* primary = runtime.fonts().add("primary", std::string(IMGUI_UI_ASSETS_DIR) + "/fonts/Inter.ttf");
+    Font* primary = runtime.fonts().add("primary", std::string(ARBOR_ASSETS_DIR) + "/fonts/Inter.ttf");
     Surface surface = ui_test::make_surface(runtime);
     surface.set_primary_font(primary);
     auto& text = surface.root().add<Widget>("primary-font-text");
@@ -168,8 +235,7 @@ TEST_CASE("paint callbacks apply owner and decoration alpha once", "[Painter][pa
         StyledNode node;
         node.set_size({px(60.0F), px(30.0F)});
         node.style().alpha(0.5F);
-        node.before().style().alpha(0.4F);
-        node.before().set_opacity(0.5F);
+        node.before().style().alpha(0.2f);
 
         int first_vertex = -1;
         node.before().set_draw_callback([&](const PaintContext& context) {
@@ -575,32 +641,21 @@ TEST_CASE("external subtrees transfer ownership and reconnect surface input", "[
 
 TEST_CASE("clearing children defers subtree destruction and clears input targets") {
     int destructions = 0;
-
-    class LifetimeNode final : public Node {
-    public:
-        explicit LifetimeNode(int& destructions) : m_destructions(destructions) {}
-        ~LifetimeNode() override {
-            ++m_destructions;
-        }
-
-    private:
-        int& m_destructions;
-    };
-
     Node parent("parent");
-    auto& child = parent.add<LifetimeNode>(destructions);
-    child.add<LifetimeNode>(destructions);
+    auto& child = parent.add<LifecycleWidget>(&destructions);
+    child.add<LifecycleWidget>(&destructions);
 
     InputRouter router;
     parent.set_input_router(&router);
     REQUIRE(router.set_focus(&child));
     REQUIRE(router.capture_pointer(child));
 
+    // clear removes input eligibility immediately but keeps the subtree alive until its parent's next update.
     parent.clear();
     REQUIRE(child.removal_pending());
     REQUIRE(destructions == 0);
 
-    parent.update(0.0F);
+    parent.update(0.0f);
 
     REQUIRE(parent.children().empty());
     REQUIRE(destructions == 2);
@@ -608,81 +663,25 @@ TEST_CASE("clearing children defers subtree destruction and clears input targets
 }
 
 TEST_CASE("nodes can remove active widgets and containers during update") {
-    class UpdateCounter final : public Widget {
-    public:
-        explicit UpdateCounter(int& updates) : Widget("update-counter"), m_updates(updates) {}
-
-    private:
-        void on_update(float) override {
-            ++m_updates;
-        }
-
-        int& m_updates;
-    };
-
-    class SelfRemovingWidget final : public Widget {
-    public:
-        SelfRemovingWidget(Container& owner, int& updates, int& destructions)
-            : Widget("self-removing"), m_owner(owner), m_updates(updates), m_destructions(destructions) {}
-
-        ~SelfRemovingWidget() override {
-            ++m_destructions;
-        }
-
-    private:
-        void on_update(float) override {
-            ++m_updates;
-            m_owner.remove(*this);
-        }
-
-        Container& m_owner;
-        int& m_updates;
-        int& m_destructions;
-    };
-
-    class TrackedLayer final : public LayerContainer {
-    public:
-        explicit TrackedLayer(int& destructions) : LayerContainer("tracked-layer"), m_destructions(destructions) {}
-
-        ~TrackedLayer() override {
-            ++m_destructions;
-        }
-
-    private:
-        int& m_destructions;
-    };
-
-    class RemoveLayerOnUpdate final : public Widget {
-    public:
-        RemoveLayerOnUpdate(Node& owner, Node& layer, int& updates)
-            : Widget("remove-layer"), m_owner(owner), m_layer(layer), m_updates(updates) {}
-
-    private:
-        void on_update(float) override {
-            ++m_updates;
-            m_owner.remove(m_layer);
-        }
-
-        Node& m_owner;
-        Node& m_layer;
-        int& m_updates;
-    };
-
     int self_updates = 0;
     int self_destructions = 0;
     int container_sibling_updates = 0;
     Container container("self-removal-container");
-    auto& self_remover = container.add<SelfRemovingWidget>(container, self_updates, self_destructions);
-    container.add<UpdateCounter>(container_sibling_updates);
+    auto& self_remover = container.add<LifecycleWidget>(&self_destructions, [&](Widget& self) {
+        ++self_updates;
+        container.remove(self);
+    });
+    container.add<LifecycleWidget>(nullptr, [&](Widget&) { ++container_sibling_updates; });
 
-    container.update(1.0F);
+    // self-removal marks the current child without destroying the object while its update callback is running.
+    container.update(1.0f);
 
     REQUIRE(self_updates == 1);
     REQUIRE(self_remover.removal_pending());
     REQUIRE(self_destructions == 0);
     REQUIRE(container_sibling_updates == 1);
 
-    container.update(1.0F);
+    container.update(1.0f);
     REQUIRE(self_destructions == 1);
     REQUIRE(container.children().size() == 1);
     REQUIRE(container_sibling_updates == 2);
@@ -691,59 +690,39 @@ TEST_CASE("nodes can remove active widgets and containers during update") {
     int remover_updates = 0;
     int root_sibling_updates = 0;
     Node root("update-root");
-    auto& layer = root.add<TrackedLayer>(layer_destructions);
-    layer.add<RemoveLayerOnUpdate>(root, layer, remover_updates);
-    root.add<UpdateCounter>(root_sibling_updates);
+    auto& layer = root.add<LayerContainer>("tracked-layer");
+    layer.add<LifecycleWidget>(&layer_destructions, [&](Widget&) {
+        ++remover_updates;
+        root.remove(layer);
+    });
+    root.add<LifecycleWidget>(nullptr, [&](Widget&) { ++root_sibling_updates; });
 
-    root.update(1.0F);
+    root.update(1.0f);
 
     REQUIRE(remover_updates == 1);
     REQUIRE(layer.removal_pending());
     REQUIRE(layer_destructions == 0);
     REQUIRE(root_sibling_updates == 1);
 
-    root.update(1.0F);
+    root.update(1.0f);
     REQUIRE(layer_destructions == 1);
     REQUIRE(root.children().size() == 1);
     REQUIRE(root_sibling_updates == 2);
 }
 
 TEST_CASE("containers can clear descendants during update") {
-    class ClearOwnerOnUpdate final : public Widget {
-    public:
-        explicit ClearOwnerOnUpdate(Container& owner) : Widget("clear-owner"), m_owner(owner) {}
-
-    private:
-        void on_update(float) override {
-            m_owner.clear();
-        }
-
-        Container& m_owner;
-    };
-
-    class TrackedWidget final : public Widget {
-    public:
-        explicit TrackedWidget(int& destructions) : Widget("tracked-child"), m_destructions(destructions) {}
-
-        ~TrackedWidget() override {
-            ++m_destructions;
-        }
-
-    private:
-        int& m_destructions;
-    };
-
     int destructions = 0;
     Container container("clear-during-update");
-    auto& clearer = container.add<ClearOwnerOnUpdate>(container);
-    container.add<TrackedWidget>(destructions);
+    auto& clearer = container.add<LifecycleWidget>(nullptr, [&](Widget&) { container.clear(); });
+    container.add<LifecycleWidget>(&destructions);
 
-    container.update(1.0F);
+    // the later sibling is removed before its turn, while the currently updating child survives until the next pass.
+    container.update(1.0f);
 
     REQUIRE(clearer.removal_pending());
     REQUIRE(destructions == 1);
 
-    container.update(1.0F);
+    container.update(1.0f);
     REQUIRE(container.children().empty());
 }
 

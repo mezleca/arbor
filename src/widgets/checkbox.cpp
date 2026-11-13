@@ -1,14 +1,14 @@
-#include <imgui-ui/widgets/checkbox.hpp>
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/text.hpp>
+#include <arbor/widgets/checkbox.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/text.hpp>
 
 #include <algorithm>
 
 using namespace ui;
 
 CheckboxWidget::CheckboxWidget(WidgetValue<bool> value, std::string label, LabelPlacement placement, std::string id)
-    : Widget(std::move(id), StackDirection::Horizontal, "Checkbox"), m_value(std::move(value)) {
+    : Widget(std::move(id), StackDirection::Horizontal, "Checkbox"), m_value(value) {
     set_size({fit(), fit()});
     set_content_alignment(Anchor::CenterLeft);
 

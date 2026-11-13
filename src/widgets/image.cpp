@@ -1,5 +1,5 @@
-#include <imgui-ui/widgets/image.hpp>
-#include <imgui-ui/resources/texture-registry.hpp>
+#include <arbor/widgets/image.hpp>
+#include <arbor/resources/texture-registry.hpp>
 
 #include <algorithm>
 
@@ -35,7 +35,7 @@ ImVec2 ImageWidget::measure_content(ImVec2 available) const {
     const ImVec2 children_size = measure_children(available);
     if (m_texture != nullptr) {
         const ImVec2 texture_size = m_texture->size();
-        return {std::max(texture_size.x, children_size.x), std::max(texture_size.y, children_size.y)};
+        return {std::max(texture_size.x * dpi_scale(), children_size.x), std::max(texture_size.y * dpi_scale(), children_size.y)};
     }
     return children_size;
 }
@@ -62,11 +62,13 @@ void ImageWidget::paint_content(const PaintContext& context) {
         }
     }
 
-    const ImTextureID texture_id = m_texture->get(image.size());
+    const Rect native_image = context.painter.to_screen(image);
+    const ImTextureID texture_id = m_texture->get(native_image.size());
     ImDrawList& draw_list = context.painter.draw_list();
     const bool clip_image = m_fit == ImageFit::Cover;
     if (clip_image) {
-        draw_list.PushClipRect(content.min, content.max, true);
+        const Rect native_content = context.painter.to_screen(content);
+        draw_list.PushClipRect(native_content.min, native_content.max, true);
     }
 
     context.painter.image(texture_id, image, m_uv_min, m_uv_max, context.style.color().value, context.style.border_radius());

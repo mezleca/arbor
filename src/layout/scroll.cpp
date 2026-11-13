@@ -1,6 +1,6 @@
-#include <imgui-ui/layout/scroll.hpp>
+#include <arbor/layout/scroll.hpp>
 
-#include <imgui-ui/transition.hpp>
+#include <arbor/transition.hpp>
 
 #include <algorithm>
 #include <cmath>

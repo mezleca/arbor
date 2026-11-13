@@ -1,23 +1,23 @@
-#include <imgui-ui/style/tween/animator.hpp>
-#include <imgui-ui/style/state.hpp>
-#include <imgui-ui/runtime.hpp>
-#include <imgui-ui/diagnostics/debugger.hpp>
-#include <imgui-ui/layout/container.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/layout/virtual-layout.hpp>
-#include <imgui-ui/resources/texture-registry.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/box.hpp>
-#include <imgui-ui/widgets/button.hpp>
-#include <imgui-ui/widgets/checkbox.hpp>
-#include <imgui-ui/widgets/color-picker.hpp>
-#include <imgui-ui/widgets/context-menu.hpp>
-#include <imgui-ui/widgets/dropdown.hpp>
-#include <imgui-ui/widgets/image.hpp>
-#include <imgui-ui/widgets/number-input.hpp>
-#include <imgui-ui/widgets/text.hpp>
-#include <imgui-ui/widgets/text-input.hpp>
-#include <imgui-ui/imgui/painter.hpp>
+#include <arbor/style/tween/animator.hpp>
+#include <arbor/style/state.hpp>
+#include <arbor/runtime.hpp>
+#include <arbor/diagnostics/debugger.hpp>
+#include <arbor/layout/container.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/layout/virtual-layout.hpp>
+#include <arbor/resources/texture-registry.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/box.hpp>
+#include <arbor/widgets/button.hpp>
+#include <arbor/widgets/checkbox.hpp>
+#include <arbor/widgets/color-picker.hpp>
+#include <arbor/widgets/context-menu.hpp>
+#include <arbor/widgets/dropdown.hpp>
+#include <arbor/widgets/image.hpp>
+#include <arbor/widgets/number-input.hpp>
+#include <arbor/widgets/text.hpp>
+#include <arbor/widgets/text-input.hpp>
+#include <arbor/imgui/painter.hpp>
 #include "imgui-context.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -377,38 +377,41 @@ TEST_CASE("image fit preserves the texture aspect ratio", "[ImageWidget][fit]") 
         ImVec2 requested_size;
     };
 
-    ui_test::ImGuiContext context({240.0F, 180.0F});
-    const auto draw = [](ImageFit fit) {
-        ProbeTexture texture;
-        ImageWidget image(&texture);
-        image.set_size({px(100.0F), px(100.0F)});
-        image.set_fit(fit);
-
-        ui_test::draw_node(image, "image-fit-test");
-        return texture.requested_size;
-    };
-
-    const ImVec2 cover_size = draw(ImageFit::Cover);
-    REQUIRE(cover_size.x == Catch::Approx(200.0F));
-    REQUIRE(cover_size.y == Catch::Approx(100.0F));
-
     ProbeTexture texture;
-    Container container("responsive-image");
-    container.set_size({px(100.0F), px(100.0F)});
-    auto& image = container.add<ImageWidget>(&texture);
-    image.set_size({grow(), grow()});
-    image.set_fit(ImageFit::Contain);
+    Runtime runtime;
 
-    const auto draw_container = [&container] { ui_test::draw_node(container, "responsive-image-test"); };
+    Surface surface = ui_test::make_surface(runtime);
+    const ImGuiContextScope scope(surface.imgui_context());
+    ImGui::GetIO().DisplaySize = {800.0f, 600.0f};
+    ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
+    auto& viewport = surface.root().add<Container>("scaled images");
+    viewport.set_size({px(100.0f), px(100.0f)});
+    auto& scaled = viewport.add<ImageWidget>(&texture);
+    scaled.set_size({grow(), grow()});
+    scaled.set_fit(ImageFit::Contain);
+    ui_test::draw_surface(surface);
+    REQUIRE(texture.requested_size.x == Catch::Approx(100.0f));
+    REQUIRE(texture.requested_size.y == Catch::Approx(50.0f));
 
-    draw_container();
-    REQUIRE(texture.requested_size.x == Catch::Approx(100.0F));
-    REQUIRE(texture.requested_size.y == Catch::Approx(50.0F));
+    viewport.set_size({px(200.0f), px(100.0f)});
+    ui_test::draw_surface(surface);
+    REQUIRE(texture.requested_size.x == Catch::Approx(200.0f));
+    REQUIRE(texture.requested_size.y == Catch::Approx(100.0f));
+    viewport.set_size({px(100.0f), px(100.0f)});
 
-    container.set_size({px(200.0F), px(100.0F)});
-    draw_container();
-    REQUIRE(texture.requested_size.x == Catch::Approx(200.0F));
-    REQUIRE(texture.requested_size.y == Catch::Approx(100.0F));
+    for (float scale : {1.0f, 1.5f, 2.0f, 1.0f}) {
+        surface.set_scale(scale);
+        for (const auto& [fit, expected] : {
+                 std::pair{ImageFit::Fill, ImVec2{100.0f, 100.0f}},
+                 std::pair{ImageFit::Contain, ImVec2{100.0f, 50.0f}},
+                 std::pair{ImageFit::Cover, ImVec2{200.0f, 100.0f}},
+             }) {
+            scaled.set_fit(fit);
+            ui_test::draw_surface(surface);
+            CHECK(texture.requested_size.x == Catch::Approx(expected.x * scale).margin(1.0f));
+            CHECK(texture.requested_size.y == Catch::Approx(expected.y * scale).margin(1.0f));
+        }
+    }
 }
 
 TEST_CASE("dropdown opens from a nested container without extending its parent", "[dropdown][container][regression]") {
@@ -677,10 +680,10 @@ TEST_CASE("wrapped ellipsis truncates the last visible line", "[TextWidget][rend
 
     const auto truncates = [&](float clip_width) {
         const Painter painter(*draw_list);
-        const ImVec4 threshold_clip =
-            painter.visible_clip({position.x, position.y, position.x + clip_width, position.y + height});
         const int start = draw_list->VtxBuffer.Size;
-        painter.text_ellipsis(position, rgb(1, 1, 1), fitting, threshold_clip);
+        painter.text_ellipsis(
+            position, rgb(1, 1, 1), fitting, {position.x, position.y, position.x + clip_width, position.y + height}
+        );
         return draw_list->VtxBuffer.Size - start < full_vertices;
     };
 
@@ -693,6 +696,32 @@ TEST_CASE("wrapped ellipsis truncates the last visible line", "[TextWidget][rend
     draw_list->PopClipRect();
     ImGui::End();
     ImGui::EndFrame();
+}
+
+TEST_CASE("dropdown keyboard navigation belongs to its focused branch", "[DropdownWidget][input][focus]") {
+    Runtime runtime;
+    Surface surface = ui_test::make_surface(runtime);
+    auto& input = surface.root().add<TextInputWidget>();
+    auto& dropdown =
+        surface.root().add<DropdownWidget>(std::string{"one"}, std::vector<DropdownOption>{{"one", "one"}, {"two", "two"}});
+    const auto context = ui_test::prepare_surface(surface, {320.0f, 240.0f});
+    ui_test::draw_surface(surface);
+
+    for (Node* focused : {static_cast<Node*>(nullptr), static_cast<Node*>(&input)}) {
+        REQUIRE(surface.input_router().set_focus(focused));
+        for (ImGuiKey key : {ImGuiKey_Enter, ImGuiKey_DownArrow}) {
+            UiEvent event = UiEvent::make(EventType::KeyDown);
+            event.key = key;
+            surface.dispatch(event);
+            CHECK_FALSE(dropdown.is_open());
+        }
+    }
+
+    REQUIRE(surface.input_router().set_focus(&dropdown.trigger()));
+    UiEvent enter = UiEvent::make(EventType::KeyDown);
+    enter.key = ImGuiKey_Enter;
+    surface.dispatch(enter);
+    CHECK(dropdown.is_open());
 }
 
 TEST_CASE("value widgets notify only when their value changes", "[Widget][change]") {
@@ -726,24 +755,12 @@ TEST_CASE("value widgets notify only when their value changes", "[Widget][change
     REQUIRE_FALSE(dropdown.select_value("two"));
     REQUIRE_FALSE(text_input.set_value("after"));
     REQUIRE(changes == 4);
-
-    int value_changes = 0;
-    WidgetValue<bool> owned_value(true);
-    owned_value.on_change([&value_changes](const bool& value) {
-        ++value_changes;
-        REQUIRE_FALSE(value);
-    });
-    CheckboxWidget owned_checkbox(std::move(owned_value), "owned");
-
-    REQUIRE(owned_checkbox.set_checked(false));
-    REQUIRE(value_changes == 1);
-    REQUIRE_FALSE(owned_checkbox.set_checked(false));
-    REQUIRE(value_changes == 1);
 }
 
-TEST_CASE("paint-only animation overrides do not invalidate measurement", "[VisualState][animation][regression]") {
+TEST_CASE("paint-only styles and animations do not invalidate measurement", "[VisualState][animation][regression]") {
     VisualState state;
     int invalidations = 0;
+
     state.set_change_callback(&invalidations, [](void* owner, bool) { ++*static_cast<int*>(owner); });
     state.animate().to(StyleAnimationProperty::Color, rgb(1.0F, 0.0F, 0.0F), {0.2F, easing::linear});
     state.update(0.1F);

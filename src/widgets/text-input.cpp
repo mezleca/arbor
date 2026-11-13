@@ -1,9 +1,10 @@
-#include <imgui-ui/widgets/text-input.hpp>
+#include <arbor/widgets/text-input.hpp>
 
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/image.hpp>
-#include <imgui-ui/widgets/text.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/image.hpp>
+#include <arbor/widgets/text.hpp>
 
 #include <imgui_internal.h>
 #include <algorithm>
@@ -156,11 +157,19 @@ void TextInputWidget::event(UiEvent& event) {
     if (event.type == EventType::FocusGained && event.target == this) {
         m_focus_requested = true;
     }
+
+    // routed clicks may never reach imgui. clear native input focus too so paint cannot reclaim the released focus.
+    if (event.type == EventType::FocusLost && event.target == this) {
+        m_focus_requested = false;
+        const ImGuiContextScope scope(surface().imgui_context());
+        ImGui::ClearActiveID();
+    }
+
     if (event.type == EventType::PointerDown && event.button == PointerButton::Left && event.target == this) {
         m_focus_requested = surface().input_router().set_focus(this);
     }
 
-    if (event.type == EventType::Cancel || (event.type == EventType::KeyDown && event.key == Key::Escape)) {
+    if (event.type == EventType::Cancel || (event.type == EventType::KeyDown && event.key == ImGuiKey_Escape)) {
         const bool focused = input_state().focused;
         if (focused) {
             surface().input_router().restore_focus(*this);
@@ -173,9 +182,12 @@ void TextInputWidget::event(UiEvent& event) {
 
 void TextInputWidget::apply_theme_defaults(const Theme& theme) {
     Container::apply_theme_defaults(theme);
+
     const TransitionSpec transition{0.25F, easing::out_quad};
+
     m_label_spacing = {theme.metrics.item_inner_spacing.x, theme.metrics.item_spacing.y};
     set_label_layout(m_label_placement, m_label_spacing);
+
     m_input_node->set_spacing(theme.metrics.item_inner_spacing.x);
     m_leading->set_spacing(theme.metrics.item_inner_spacing.x);
     m_trailing->set_spacing(theme.metrics.item_inner_spacing.x);
@@ -208,6 +220,7 @@ void TextInputWidget::apply_theme_defaults(const Theme& theme) {
 
 void TextInputWidget::input_state_changed() {
     Container::input_state_changed();
+
     const InputState& state = input_state();
     m_input_node->set_interaction_style(state.hovered, state.active, state.focused);
     m_icon_node->set_interaction_style(state.hovered, state.active, state.focused);

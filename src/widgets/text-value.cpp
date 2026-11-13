@@ -1,4 +1,5 @@
-#include <imgui-ui/widgets/text-value.hpp>
+#include <arbor/widgets/text-value.hpp>
+#include <arbor/layout/geometry.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -6,9 +7,15 @@
 using namespace ui;
 
 void TextValue::set_font(ImFont* font, float size) {
-    if (font == m_font && size == m_font_size) return;
+    // zoom and framebuffer density can change hinted advances without changing the configured font size.
+    const float density = ImGui::GetCurrentContext() != nullptr
+                              ? dpi_scale() * ImGui::GetStyle().FontScaleMain * ImGui::GetIO().DisplayFramebufferScale.x
+                              : 1.0f;
+    if (font == m_font && size == m_font_size && density == m_font_density) return;
+
     m_font = font;
     m_font_size = size;
+    m_font_density = density;
     m_dirty = true;
 }
 
@@ -46,7 +53,7 @@ void TextValue::recompute() const {
     ImFont* font = m_font != nullptr ? m_font : ImGui::GetFont();
     ImGui::PushFont(font, m_font_size > 0.0F ? m_font_size : font->LegacySize);
     const float line_height = ImGui::GetTextLineHeight();
-    m_text_size = ImGui::CalcTextSize(c_str(), nullptr, false, m_wrap_width);
+    m_text_size = ImGui::CalcTextSize(c_str(), nullptr, false, m_wrap_width * dpi_scale());
 
     // imgui measures wrapped and explicit lines using native line height.
     // recover that line count before applying the configured height multiplier.

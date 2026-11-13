@@ -2,24 +2,24 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
-#include <imgui-ui/backends/opengl/texture-loader.hpp>
-#include <imgui-ui/backends/sdl/backend.hpp>
-#include <imgui-ui/diagnostics/debugger.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/layout/container.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/layout/resizable-container.hpp>
-#include <imgui-ui/layout/tree-container.hpp>
-#include <imgui-ui/layout/virtual-layout.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/button.hpp>
-#include <imgui-ui/widgets/checkbox.hpp>
-#include <imgui-ui/widgets/dropdown.hpp>
-#include <imgui-ui/widgets/file-dialog.hpp>
-#include <imgui-ui/widgets/image.hpp>
-#include <imgui-ui/widgets/number-input.hpp>
-#include <imgui-ui/widgets/text.hpp>
-#include <imgui-ui/widgets/text-input.hpp>
+#include <arbor/backends/opengl/texture-loader.hpp>
+#include <arbor/backends/sdl/backend.hpp>
+#include <arbor/diagnostics/debugger.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/layout/container.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/layout/resizable-container.hpp>
+#include <arbor/layout/tree-container.hpp>
+#include <arbor/layout/virtual-layout.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/button.hpp>
+#include <arbor/widgets/checkbox.hpp>
+#include <arbor/widgets/dropdown.hpp>
+#include <arbor/widgets/file-dialog.hpp>
+#include <arbor/widgets/image.hpp>
+#include <arbor/widgets/number-input.hpp>
+#include <arbor/widgets/text.hpp>
+#include <arbor/widgets/text-input.hpp>
 
 #include <SDL3/SDL.h>
 #include <glad/gl.h>
@@ -31,10 +31,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <fstream>
 #include <iterator>
+#include <numbers>
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 class SdlVideoSession final {
@@ -47,7 +50,7 @@ public:
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
         m_window = SDL_CreateWindow(
-            "imgui-ui test", static_cast<int>(size.x), static_cast<int>(size.y), SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN
+            "arbor test", static_cast<int>(size.x), static_cast<int>(size.y), SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN
         );
         m_context = m_window == nullptr ? nullptr : SDL_GL_CreateContext(m_window);
         bool supports_opengl = m_context != nullptr;
@@ -114,6 +117,36 @@ static void draw_frame(ui::Surface& surface, std::optional<float> delta_time = s
     ImGui_ImplOpenGL3_RenderDrawData(draw_data);
     glFinish();
     surface.end_frame();
+}
+
+TEST_CASE("surface scale preserves native pointer targeting", "[surface][scale]") {
+    SdlVideoSession sdl({320.0f, 240.0f});
+    ui::Runtime runtime;
+    ui::Surface surface(runtime, {.backend = make_sdl_backend(sdl)});
+    const auto context = ui_test::prepare_surface(surface);
+    auto& button = surface.root().add<ui::ButtonWidget>("scaled");
+    button.set_layout({
+        .size = {ui::px(100.0f), ui::px(40.0f)},
+        .placement = {.offset = {10.0f, 10.0f}},
+        .in_flow = false,
+    });
+    int clicks = 0;
+    button.on_click([&] { ++clicks; });
+
+    int expected_clicks = 0;
+    for (float scale : {1.0f, 2.0f, 1.25f, 1.0f}) {
+        surface.set_scale(scale);
+        ui_test::draw_surface(surface);
+
+        const ImVec2 position = ui_test::center(button.layout().visual_rect());
+        for (SDL_EventType type : {SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP}) {
+            send_sdl_pointer(surface, type, position);
+            ui_test::draw_surface(surface);
+        }
+        ++expected_clicks;
+        CHECK(clicks == expected_clicks);
+        CHECK(ImGui::GetIO().MousePos.x == Catch::Approx(position.x).margin(1.0f));
+    }
 }
 
 TEST_CASE("disabled widgets keep their style and native cursor across clicks", "[cursor][input][regression]") {
@@ -951,7 +984,7 @@ TEST_CASE("nested tree shadows escape their parent body clip", "[render][regress
 }
 
 TEST_CASE("raster textures decode from memory without a graphics context", "[texture][raster]") {
-    const auto path = std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "images/tiny.jpg";
+    const auto path = std::filesystem::path{ARBOR_ASSETS_DIR} / "images/tiny.jpg";
     std::ifstream file(path, std::ios::binary);
     REQUIRE(file.is_open());
     const std::string bytes{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
@@ -1000,7 +1033,7 @@ TEST_CASE("unsupported texture data returns an empty handle", "[texture][regress
     const auto entries = textures.stats().entry_count;
     REQUIRE(textures.acquire("unsupported", std::string_view{"not an image"}) == nullptr);
     REQUIRE(textures.acquire("broken-gif", std::string_view{"GIF89a"}) == nullptr);
-    REQUIRE(textures.add("unsupported-file", std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "../CMakeLists.txt") == nullptr);
+    REQUIRE(textures.add("unsupported-file", std::filesystem::path{ARBOR_ASSETS_DIR} / "../CMakeLists.txt") == nullptr);
     REQUIRE(textures.stats().entry_count == entries);
 }
 
@@ -1033,7 +1066,7 @@ TEST_CASE("texture cache collects real gpu uploads after rendering and recreates
     const auto surface_context = ui_test::prepare_surface(surface);
     ui::TextureHandle texture;
     SECTION("raster") {
-        texture = runtime.textures().acquire("cover", std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "images/tiny.jpg");
+        texture = runtime.textures().acquire("cover", std::filesystem::path{ARBOR_ASSETS_DIR} / "images/tiny.jpg");
     }
     SECTION("svg") {
         texture =
@@ -1041,7 +1074,7 @@ TEST_CASE("texture cache collects real gpu uploads after rendering and recreates
                 <rect width="4" height="4" fill="#ff00ff"/></svg>)"});
     }
     SECTION("gif") {
-        texture = runtime.textures().acquire("cover", std::filesystem::path{IMGUI_UI_ASSETS_DIR} / "images/t3.gif");
+        texture = runtime.textures().acquire("cover", std::filesystem::path{ARBOR_ASSETS_DIR} / "images/t3.gif");
     }
     REQUIRE(texture != nullptr);
     auto& image = surface.root().add<ui::ImageWidget>(texture);

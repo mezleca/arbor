@@ -1,13 +1,13 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <imgui-ui/diagnostics/debugger.hpp>
-#include <imgui-ui/diagnostics/profiler.hpp>
-#include <imgui-ui/imgui/effects/effects.hpp>
-#include <imgui-ui/layout/resizable-container.hpp>
-#include <imgui-ui/style/styled-node.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/checkbox.hpp>
-#include <imgui-ui/widgets/color-picker.hpp>
+#include <arbor/diagnostics/debugger.hpp>
+#include <arbor/diagnostics/profiler.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/layout/resizable-container.hpp>
+#include <arbor/style/styled-node.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/checkbox.hpp>
+#include <arbor/widgets/color-picker.hpp>
 
 #include <imgui.h>
 #include <imgui_internal.h>

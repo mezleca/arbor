@@ -1,16 +1,16 @@
 include(FetchContent)
 
-if(IMGUI_UI_IMGUI_DIR)
-    get_filename_component(IMGUI_UI_IMGUI_DIR "${IMGUI_UI_IMGUI_DIR}" ABSOLUTE)
-    if(NOT EXISTS "${IMGUI_UI_IMGUI_DIR}/imgui.h")
-        message(FATAL_ERROR "IMGUI_UI_IMGUI_DIR must point to an imgui source directory containing imgui.h")
+if(ARBOR_IMGUI_DIR)
+    get_filename_component(ARBOR_IMGUI_DIR "${ARBOR_IMGUI_DIR}" ABSOLUTE)
+    if(NOT EXISTS "${ARBOR_IMGUI_DIR}/imgui.h")
+        message(FATAL_ERROR "ARBOR_IMGUI_DIR must point to an imgui source directory containing imgui.h")
     endif()
 else()
-    set(IMGUI_UI_IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui")
+    set(ARBOR_IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/imgui")
 endif()
 
 # core compiles the native file dialog adapter even when both render backends are disabled.
-if(NOT TARGET imgui-ui::nfd)
+if(NOT TARGET arbor::nfd)
     if(NOT TARGET nfd AND NOT TARGET nfd::nfd)
         find_package(nfd QUIET CONFIG)
         if(NOT TARGET nfd::nfd)
@@ -28,15 +28,15 @@ if(NOT TARGET imgui-ui::nfd)
     endif()
 
     if(TARGET nfd)
-        add_library(imgui-ui::nfd ALIAS nfd)
+        add_library(arbor::nfd ALIAS nfd)
     else()
-        add_library(imgui-ui::nfd ALIAS nfd::nfd)
+        add_library(arbor::nfd ALIAS nfd::nfd)
     endif()
 endif()
 
 # building imgui here includes its freetype renderer, which requires the freetype headers and library.
-if(NOT TARGET imgui-ui::imgui)
-    if(NOT TARGET imgui-ui-imgui)
+if(NOT TARGET arbor::imgui)
+    if(NOT TARGET arbor-imgui)
         if(NOT TARGET Freetype::Freetype AND NOT TARGET freetype)
             find_package(Freetype QUIET)
             if(NOT TARGET Freetype::Freetype)
@@ -52,37 +52,37 @@ if(NOT TARGET imgui-ui::imgui)
             add_library(Freetype::Freetype ALIAS freetype)
         endif()
 
-        add_library(imgui-ui-imgui STATIC
-            "${IMGUI_UI_IMGUI_DIR}/imgui.cpp"
-            "${IMGUI_UI_IMGUI_DIR}/imgui_draw.cpp"
-            "${IMGUI_UI_IMGUI_DIR}/imgui_tables.cpp"
-            "${IMGUI_UI_IMGUI_DIR}/imgui_widgets.cpp"
-            "${IMGUI_UI_IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp"
-            "${IMGUI_UI_IMGUI_DIR}/misc/freetype/imgui_freetype.cpp"
+        add_library(arbor-imgui STATIC
+            "${ARBOR_IMGUI_DIR}/imgui.cpp"
+            "${ARBOR_IMGUI_DIR}/imgui_draw.cpp"
+            "${ARBOR_IMGUI_DIR}/imgui_tables.cpp"
+            "${ARBOR_IMGUI_DIR}/imgui_widgets.cpp"
+            "${ARBOR_IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp"
+            "${ARBOR_IMGUI_DIR}/misc/freetype/imgui_freetype.cpp"
         )
 
-        target_include_directories(imgui-ui-imgui PUBLIC
-            "${CMAKE_CURRENT_SOURCE_DIR}/include/imgui-ui/imgui"
-            "${IMGUI_UI_IMGUI_DIR}"
-            "${IMGUI_UI_IMGUI_DIR}/misc/cpp"
+        target_include_directories(arbor-imgui PUBLIC
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/arbor/imgui"
+            "${ARBOR_IMGUI_DIR}"
+            "${ARBOR_IMGUI_DIR}/misc/cpp"
         )
 
-        target_compile_definitions(imgui-ui-imgui PUBLIC IMGUI_ENABLE_FREETYPE PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
-        target_link_libraries(imgui-ui-imgui PUBLIC Freetype::Freetype)
-        target_precompile_headers(imgui-ui-imgui PRIVATE
-            "${IMGUI_UI_IMGUI_DIR}/imgui_internal.h"
+        target_compile_definitions(arbor-imgui PUBLIC IMGUI_ENABLE_FREETYPE PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
+        target_link_libraries(arbor-imgui PUBLIC Freetype::Freetype)
+        target_precompile_headers(arbor-imgui PRIVATE
+            "${ARBOR_IMGUI_DIR}/imgui_internal.h"
         )
     endif()
 
-    add_library(imgui-ui::imgui ALIAS imgui-ui-imgui)
+    add_library(arbor::imgui ALIAS arbor-imgui)
 endif()
 
 # core does not compile the opengl effects or texture loaders below.
-if(NOT IMGUI_UI_BUILD_SDL AND NOT IMGUI_UI_BUILD_RAYLIB)
+if(NOT ARBOR_BUILD_SDL AND NOT ARBOR_BUILD_RAYLIB)
     return()
 endif()
 
-if(NOT TARGET imgui-ui::glad)
+if(NOT TARGET arbor::glad)
     if(NOT TARGET glad)
         FetchContent_Declare(glad
             URL https://codeload.github.com/mezleca/glad/tar.gz/987653e300a5575e063983bf63ad938285684ac9
@@ -91,7 +91,7 @@ if(NOT TARGET imgui-ui::glad)
         FetchContent_MakeAvailable(glad)
     endif()
 
-    add_library(imgui-ui::glad ALIAS glad)
+    add_library(arbor::glad ALIAS glad)
 endif()
 
 find_package(OpenGL REQUIRED)
@@ -105,11 +105,11 @@ if(NOT TARGET nsgif)
     target_include_directories(nsgif PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/vendor/libnsgif/include")
 endif()
 
-if(NOT TARGET imgui-ui::nsgif)
-    add_library(imgui-ui::nsgif ALIAS nsgif)
+if(NOT TARGET arbor::nsgif)
+    add_library(arbor::nsgif ALIAS nsgif)
 endif()
 
-if(NOT TARGET imgui-ui::lunasvg)
+if(NOT TARGET arbor::lunasvg)
     if(NOT TARGET lunasvg AND NOT TARGET lunasvg::lunasvg)
         find_package(lunasvg 3.5 QUIET CONFIG)
         if(NOT TARGET lunasvg::lunasvg)
@@ -129,9 +129,9 @@ if(NOT TARGET imgui-ui::lunasvg)
     endif()
 
     if(TARGET lunasvg)
-        add_library(imgui-ui::lunasvg ALIAS lunasvg)
+        add_library(arbor::lunasvg ALIAS lunasvg)
     else()
-        add_library(imgui-ui::lunasvg ALIAS lunasvg::lunasvg)
+        add_library(arbor::lunasvg ALIAS lunasvg::lunasvg)
     endif()
 endif()
 
@@ -141,7 +141,7 @@ if(NOT TARGET plutovg::plutovg)
 endif()
 
 # downloading sdl is the fallback after both cmake packages and pkg-config miss the system installation.
-if(IMGUI_UI_BUILD_SDL AND NOT TARGET SDL3::SDL3)
+if(ARBOR_BUILD_SDL AND NOT TARGET SDL3::SDL3)
     find_package(SDL3 3.2 QUIET CONFIG)
 
     if(NOT TARGET SDL3::SDL3)
@@ -169,7 +169,7 @@ if(IMGUI_UI_BUILD_SDL AND NOT TARGET SDL3::SDL3)
     endif()
 endif()
 
-if(IMGUI_UI_BUILD_RAYLIB AND NOT TARGET raylib)
+if(ARBOR_BUILD_RAYLIB AND NOT TARGET raylib)
     find_package(raylib 6.0 QUIET CONFIG)
     if(NOT TARGET raylib)
         if(UNIX AND NOT APPLE)

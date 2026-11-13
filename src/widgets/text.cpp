@@ -1,5 +1,5 @@
-#include <imgui-ui/widgets/text.hpp>
-#include <imgui-ui/imgui/painter.hpp>
+#include <arbor/widgets/text.hpp>
+#include <arbor/imgui/painter.hpp>
 
 #include <imgui.h>
 #include <algorithm>
@@ -40,7 +40,7 @@ TextWidget& TextWidget::set_alignment(ImVec2 alignment) {
 
 ImVec2 TextWidget::measure_size(ImVec2 allocation) const {
     if (!m_wrap_available) return Node::measure_size(allocation);
-    const float width = content_size(allocation).x;
+    const float width = content_size(allocation).x / dpi_scale();
     m_text.set_wrap(std::isfinite(width) ? std::max(1.0f, width) : -1.0f);
     return outer_size(m_text.text_size());
 }
@@ -72,16 +72,17 @@ void TextWidget::on_measure() {
 
 bool TextWidget::paint() {
     const ComputedStyle& current_style = computed_style();
+    const Painter paint = painter();
     const ImVec2 minimum = ImGui::GetCursorScreenPos();
-    const Rect outer = Rect::from_position_size(minimum, layout().size());
-    const Rect content = content_rect(outer);
-    const ImVec2 text_size = m_text.text_size();
+    const Rect native_outer = Rect::from_position_size(minimum, layout().size());
+    const Rect outer = paint.to_logical(native_outer);
+    const Rect content = paint.to_logical(content_rect(native_outer));
+    const ImVec2 text_size = paint.to_logical(m_text.text_size());
     const ImVec2 position = {
         content.min.x + (std::max(0.0f, content.size().x - text_size.x) * m_alignment.x),
         content.min.y + (std::max(0.0f, content.size().y - text_size.y) * m_alignment.y),
     };
 
-    const Painter paint = painter();
     paint.frame(outer, current_style);
 
     ImGui::Dummy(layout().size());
@@ -89,8 +90,7 @@ bool TextWidget::paint() {
     const bool clipped = current_style.overflow() != Overflow::Visible;
 
     if (m_overflow == TextOverflow::Ellipsis) {
-        // ancestor overflow narrows the visible width without changing this node's content rect.
-        paint.text_ellipsis(position, current_style.color().value, m_text, paint.visible_clip(clip_rect));
+        paint.text_ellipsis(position, current_style.color().value, m_text, clip_rect);
     } else {
         paint.text(position, current_style.color().value, m_text, clipped ? &clip_rect : nullptr);
     }

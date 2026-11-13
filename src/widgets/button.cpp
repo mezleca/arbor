@@ -1,7 +1,7 @@
-#include <imgui-ui/widgets/button.hpp>
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/style/theme.hpp>
+#include <arbor/widgets/button.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/style/theme.hpp>
 
 #include <algorithm>
 #include <utility>
@@ -58,7 +58,7 @@ void ButtonWidget::mouse_press_event(UiEvent& event) {
 }
 
 void ButtonWidget::key_press_event(UiEvent& event) {
-    if (event.target == this && input_state().focused && (event.key == Key::Enter || event.key == Key::Space)) {
+    if (event.target == this && input_state().focused && (event.key == ImGuiKey_Enter || event.key == ImGuiKey_Space)) {
         event.stop_propagation();
         event.block_native_input();
         click_event(event);
@@ -73,26 +73,22 @@ void ButtonWidget::on_measure() {
 }
 
 ImVec2 ButtonWidget::measure_content(ImVec2 available) const {
-    ImVec2 size = m_text.text_size();
+    const ImVec2 size = m_text.text_size();
     const ImVec2 children_size = measure_children(available);
-    size = {std::max(size.x, children_size.x), std::max(size.y, children_size.y)};
-    size.y = std::max(size.y, font_size() * computed_style().line_height());
-    return size;
+    return {std::max(size.x, children_size.x), std::max(size.y, children_size.y)};
 }
 
 void ButtonWidget::paint_content(const PaintContext& context) {
     const Rect content = context.content_rect;
-    const ImVec2 text_size = m_text.text_size();
+    const ImVec2 text_size = context.painter.to_logical(m_text.text_size());
 
     const ImVec2 position = {
         content.min.x + (std::max(0.0F, content.size().x - text_size.x) * m_text_alignment.x),
         content.min.y + ((content.size().y - text_size.y) * m_text_alignment.y),
     };
     if (m_text_overflow == TextOverflow::Ellipsis) {
-        // ancestor overflow narrows the visible width without changing this node's content rect.
         context.painter.text_ellipsis(
-            position, context.style.color().value, m_text,
-            context.painter.visible_clip({content.min.x, content.min.y, content.max.x, content.max.y})
+            position, context.style.color().value, m_text, {content.min.x, content.min.y, content.max.x, content.max.y}
         );
     } else {
         context.painter.text(position, context.style.color().value, m_text);

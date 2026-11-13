@@ -1,5 +1,5 @@
-#include <imgui-ui/input/router.hpp>
-#include <imgui-ui/tree/node.hpp>
+#include <arbor/input/router.hpp>
+#include <arbor/tree/node.hpp>
 
 #include <algorithm>
 #include <utility>
@@ -367,6 +367,12 @@ void InputRouter::route_pointer(UiEvent& event, std::vector<Node*>* reached, con
     auto route = m_hit_test.route_at(event.position, event.type);
     Node* scope = route.blocker ? route.blocker->node : nullptr;
     Node* front = route.targets.empty() ? scope : route.targets.front().node;
+
+    // release focus before dispatch so the pressed widget can claim it. an ownerless blocker absorbs the press instead.
+    if (event.type == EventType::PointerDown && m_focused_node != nullptr && !m_focused_node->contains(front) &&
+        (!route.blocker || scope != nullptr)) {
+        set_focus(nullptr);
+    }
 
     if (event.type != EventType::Scroll && event.type != EventType::Click && event.type != EventType::ContextClick) {
         set_hovered(route);

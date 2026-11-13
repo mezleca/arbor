@@ -1,4 +1,4 @@
-#include <imgui-ui/imgui/effects/gradient/opengl-shared.hpp>
+#include <arbor/imgui/effects/gradient/opengl-shared.hpp>
 
 ui::GradientUniforms ui::find_gradient_uniforms(GLuint program) {
     return {

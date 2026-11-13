@@ -1,20 +1,31 @@
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/widgets/text-value.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/widgets/text-value.hpp>
 
 #include <algorithm>
 #include <cfloat>
 
 using namespace ui;
 
+ImVec2 Painter::text_size(std::string_view text) const {
+    return to_logical(ImGui::CalcTextSize(text.data(), text.data() + text.size()));
+}
+
 void Painter::text(ImVec2 position, const Color& source, std::string_view text) const {
-    m_draw_list.AddText(position, color(source), text.data(), text.data() + text.size());
+    m_draw_list.AddText(to_screen(position), color(source), text.data(), text.data() + text.size());
 }
 
 void Painter::text(ImVec2 position, const Color& source, const TextValue& text, const ImVec4* clip_rect) const {
+    position = to_screen(position);
+    ImVec4 native_clip;
+    if (clip_rect != nullptr) {
+        native_clip = {clip_rect->x * m_scale, clip_rect->y * m_scale, clip_rect->z * m_scale, clip_rect->w * m_scale};
+        clip_rect = &native_clip;
+    }
+
     const ImColor draw_color = color(source);
     ImFont* font = text.font() != nullptr ? text.font() : ImGui::GetFont();
     const float font_size = ImGui::GetFontSize();
-    const float wrap_width = std::max(0.0F, text.wrap_width());
+    const float wrap_width = std::max(0.0f, text.wrap_width() * m_scale);
     if (text.line_height_multiplier() == 1.0F) {
         m_draw_list.AddText(font, font_size, position, draw_color, text.c_str(), nullptr, wrap_width, clip_rect);
         return;
@@ -53,14 +64,14 @@ void Painter::text(ImVec2 position, const Color& source, const TextValue& text, 
     }
 }
 
-ImVec4 Painter::visible_clip(ImVec4 clip) const {
-    const ImVec2 max = m_draw_list.GetClipRectMax();
-    clip.z = std::min(clip.z, max.x);
-    clip.w = std::min(clip.w, max.y);
-    return clip;
-}
-
 void Painter::text_ellipsis(ImVec2 position, const Color& source, const TextValue& text, ImVec4 clip_rect) const {
+    // convert before font rendering so glyph origins snap in native pixels and use the final rasterized size.
+    position = to_screen(position);
+    clip_rect = {clip_rect.x * m_scale, clip_rect.y * m_scale, clip_rect.z * m_scale, clip_rect.w * m_scale};
+    const ImVec2 visible_max = m_draw_list.GetClipRectMax();
+    clip_rect.z = std::min(clip_rect.z, visible_max.x);
+    clip_rect.w = std::min(clip_rect.w, visible_max.y);
+
     if (position.x >= clip_rect.z) {
         return;
     }
@@ -70,7 +81,7 @@ void Painter::text_ellipsis(ImVec2 position, const Color& source, const TextValu
     const float font_size = ImGui::GetFontSize();
     const float line_height = font_size * text.line_height_multiplier();
     const float available_width = clip_rect.z - position.x;
-    const float wrap_width = text.wrap_width() > 0.0F ? std::min(text.wrap_width(), available_width) : 0.0F;
+    const float wrap_width = text.wrap_width() > 0.0f ? std::min(text.wrap_width() * m_scale, available_width) : 0.0f;
     constexpr char ellipsis[] = "...";
     // imgui floors child window extents, so a fitting line can end up one pixel wider than its content rect.
     constexpr float FIT_TOLERANCE = 1.0F;

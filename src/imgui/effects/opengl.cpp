@@ -1,13 +1,15 @@
-#include <imgui-ui/imgui/effects/opengl.hpp>
-#include <imgui-ui/imgui/effects/blur/opengl.hpp>
-#include <imgui-ui/imgui/effects/gradient/opengl.hpp>
-#include <imgui-ui/imgui/effects/shadow/opengl.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
+#include <arbor/imgui/effects/clip/opengl.hpp>
+#include <arbor/imgui/effects/blur/opengl.hpp>
+#include <arbor/imgui/effects/gradient/opengl.hpp>
+#include <arbor/imgui/effects/shadow/opengl.hpp>
 #include <algorithm>
 #include <cmath>
 
 using namespace ui;
 
 void ui::register_opengl_effects(EffectRegistry& effects) {
+    register_opengl_clip(effects);
     register_opengl_blur(effects);
     register_opengl_box_shadow(effects);
     register_opengl_gradient(effects);

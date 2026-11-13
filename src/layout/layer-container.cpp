@@ -1,8 +1,9 @@
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/imgui/window.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/constants.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/imgui/window.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/constants.hpp>
+#include <arbor/surface.hpp>
 
 #include <imgui_internal.h>
 #include <utility>
@@ -171,7 +172,8 @@ void LayerContainer::prepare_window(ImVec2 position, ImVec2 size, ImGuiWindowFla
     );
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, box_insets().window_padding());
     ImGui::PushStyleVar(
-        popup ? ImGuiStyleVar_PopupRounding : ImGuiStyleVar_WindowRounding, popup ? computed_style().border_radius() : 0.0F
+        popup ? ImGuiStyleVar_PopupRounding : ImGuiStyleVar_WindowRounding,
+        popup ? computed_style().border_radius() * dpi_scale() : 0.0f
     );
     ImGui::PushStyleVar(popup ? ImGuiStyleVar_PopupBorderSize : ImGuiStyleVar_WindowBorderSize, 0.0F);
 
@@ -187,7 +189,19 @@ void LayerContainer::paint_window_contents() {
     assign_size(window_rect.size());
     set_layout_rect(window_rect);
 
+    // top-level windows escape their owner's clip. paint the frame before clipping descendants to its inner curve.
+    const Painter paint = painter();
+    const Rect viewport = viewport_work_area();
+    paint.push_clip(paint.to_logical(viewport), 0.0f, false);
     draw_surface(window_rect);
+
+    Rect inner = paint.to_logical(window_rect);
+    const BoxInsets border = computed_style().border_widths();
+    inner.min.x += border.left;
+    inner.min.y += border.top;
+    inner.max.x -= border.right;
+    inner.max.y -= border.bottom;
+    paint.push_clip(inner, std::max(0.0f, computed_style().border_radius() - computed_style().border_thickness()));
 }
 
 void LayerContainer::on_draw_end() {
@@ -195,6 +209,10 @@ void LayerContainer::on_draw_end() {
         Container::on_draw_end();
         return;
     }
+
+    const Painter paint = painter();
+    paint.pop_clip();
+    paint.pop_clip();
 
     if (m_mode == LayerMode::Popup) {
         finish_popup(true);

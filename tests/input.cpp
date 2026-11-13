@@ -1,11 +1,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include <imgui_internal.h>
 
-#include <imgui-ui/input/router.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/widget.hpp>
-#include <imgui-ui/widgets/button.hpp>
+#include <arbor/input/router.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/widget.hpp>
+#include <arbor/widgets/button.hpp>
 #include "imgui-context.hpp"
 
 #include <algorithm>
@@ -537,7 +537,7 @@ TEST_CASE("input router invalidates inactive focus and pointer capture") {
     }
 }
 
-TEST_CASE("pointer presses outside a focused node preserve focus") {
+TEST_CASE("pointer presses outside a focused node clear focus") {
     std::vector<std::string> events;
     EventNode focused("focused", events);
     EventNode other("other", events);
@@ -552,12 +552,15 @@ TEST_CASE("pointer presses outside a focused node preserve focus") {
 
     auto down = event_of(EventType::PointerDown, {80.0F, 20.0F});
     REQUIRE(router.dispatch(down));
-    REQUIRE(router.focused_node() == &focused);
-    REQUIRE(events == std::vector<std::string>{"other"});
+    REQUIRE(router.focused_node() == nullptr);
 
+    // focus loss is delivered before the press reaches the new target.
+    REQUIRE(events == std::vector<std::string>{"focused", "other"});
+
+    REQUIRE(router.set_focus(&focused));
     auto empty_down = event_of(EventType::PointerDown, {150.0F, 20.0F});
     router.dispatch(empty_down);
-    REQUIRE(router.focused_node() == &focused);
+    REQUIRE(router.focused_node() == nullptr);
 }
 
 TEST_CASE("input router clears targets when a node is detached") {

@@ -1,8 +1,8 @@
-#include <imgui-ui/tree/node.hpp>
+#include <arbor/tree/node.hpp>
 
-#include <imgui-ui/diagnostics/profiler.hpp>
-#include <imgui-ui/input/router.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/diagnostics/profiler.hpp>
+#include <arbor/input/router.hpp>
+#include <arbor/surface.hpp>
 #include <imgui_internal.h>
 #include <algorithm>
 #include <cstddef>

@@ -1,9 +1,9 @@
-#include <imgui-ui/backends/sdl/backend.hpp>
+#include <arbor/backends/sdl/backend.hpp>
 
-#include <imgui-ui/constants.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/imgui/effects/opengl.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/constants.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
+#include <arbor/surface.hpp>
 
 #include <glad/gl.h>
 #include <imgui_impl_opengl3.h>
@@ -14,6 +14,9 @@
 #include <optional>
 
 using namespace ui;
+
+// the backend exports this mapper but omits its declaration from the public header.
+ImGuiKey ImGui_ImplSDL3_KeyEventToImGuiKey(SDL_Keycode keycode, SDL_Scancode scancode);
 
 static GLADapiproc load_opengl(const char* name) {
     return reinterpret_cast<GLADapiproc>(SDL_GL_GetProcAddress(name));
@@ -55,29 +58,6 @@ static PointerButton pointer_button(uint8_t button) {
     }
 }
 
-static Key key_from_sdl(SDL_Keycode key) {
-    switch (key) {
-        case SDLK_ESCAPE:
-            return Key::Escape;
-        case SDLK_RETURN:
-            return Key::Enter;
-        case SDLK_TAB:
-            return Key::Tab;
-        case SDLK_LEFT:
-            return Key::Left;
-        case SDLK_RIGHT:
-            return Key::Right;
-        case SDLK_UP:
-            return Key::Up;
-        case SDLK_DOWN:
-            return Key::Down;
-        case SDLK_SPACE:
-            return Key::Space;
-        default:
-            return Key::Unknown;
-    }
-}
-
 static SDL_SystemCursor system_cursor(ImGuiMouseCursor cursor) {
     switch (cursor) {
         case ImGuiMouseCursor_TextInput:
@@ -110,12 +90,9 @@ static std::optional<UiEvent> event_from_sdl(const SDL_Event& event) {
 
     switch (event.type) {
         case SDL_EVENT_KEY_DOWN:
-            result.type = EventType::KeyDown;
-            result.key = key_from_sdl(event.key.key);
-            break;
         case SDL_EVENT_KEY_UP:
-            result.type = EventType::KeyUp;
-            result.key = key_from_sdl(event.key.key);
+            result.type = event.type == SDL_EVENT_KEY_DOWN ? EventType::KeyDown : EventType::KeyUp;
+            result.key = ImGui_ImplSDL3_KeyEventToImGuiKey(event.key.key, event.key.scancode);
             break;
         case SDL_EVENT_TEXT_INPUT:
             result.type = EventType::TextInput;
@@ -240,11 +217,7 @@ void SdlBackend::begin_frame(Color clear) {
     ImGui_ImplSDL3_NewFrame();
 }
 
-void SdlBackend::render(ImDrawData* draw_data) {
-    render_profiled(draw_data, false);
-}
-
-std::optional<double> SdlBackend::render_profiled(ImDrawData* draw_data, bool profile_gpu) {
+std::optional<double> SdlBackend::render(ImDrawData* draw_data, bool profile_gpu) {
     const std::optional<double> gpu_ms = m_gpu_timer.begin(profile_gpu);
     ImGui_ImplOpenGL3_RenderDrawData(draw_data);
     m_gpu_timer.end();

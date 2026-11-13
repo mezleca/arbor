@@ -1,15 +1,15 @@
-function(imgui_ui_add_example name)
-    add_executable(imgui-ui-example-${name} ${name}/main.cpp demo.cpp demo.hpp)
-    target_link_libraries(imgui-ui-example-${name} PRIVATE imgui-ui::${name})
-    target_compile_definitions(imgui-ui-example-${name} PRIVATE
-        IMGUI_UI_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets"
+function(arbor_add_example name)
+    add_executable(arbor-example-${name} ${name}/main.cpp demo.cpp demo.hpp)
+    target_link_libraries(arbor-example-${name} PRIVATE arbor::${name})
+    target_compile_definitions(arbor-example-${name} PRIVATE
+        ARBOR_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../assets"
     )
 endfunction()
 
-if(IMGUI_UI_BUILD_SDL)
-    imgui_ui_add_example(sdl)
+if(ARBOR_BUILD_SDL)
+    arbor_add_example(sdl)
 endif()
 
-if(IMGUI_UI_BUILD_RAYLIB)
-    imgui_ui_add_example(raylib)
+if(ARBOR_BUILD_RAYLIB)
+    arbor_add_example(raylib)
 endif()

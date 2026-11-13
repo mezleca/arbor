@@ -1,5 +1,5 @@
-#include <imgui-ui/file-dialog/file-dialog.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/file-dialog/file-dialog.hpp>
+#include <arbor/surface.hpp>
 
 #include <nfd.hpp>
 

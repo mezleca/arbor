@@ -1,6 +1,6 @@
-#include <imgui-ui/imgui/effects/blur/blur.hpp>
+#include <arbor/imgui/effects/blur/blur.hpp>
 
-#include <imgui-ui/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/effects.hpp>
 
 #include <algorithm>
 

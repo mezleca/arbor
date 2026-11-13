@@ -1,13 +1,13 @@
-#include <imgui-ui/resources/font-registry.hpp>
-#include <imgui-ui/widgets/button.hpp>
-#include <imgui-ui/widgets/checkbox.hpp>
-#include <imgui-ui/widgets/color-picker.hpp>
-#include <imgui-ui/widgets/context-menu.hpp>
-#include <imgui-ui/widgets/dropdown.hpp>
-#include <imgui-ui/widgets/file-dialog.hpp>
-#include <imgui-ui/widgets/number-input.hpp>
-#include <imgui-ui/widgets/text-input.hpp>
-#include <imgui-ui/widgets/text.hpp>
+#include <arbor/resources/font-registry.hpp>
+#include <arbor/widgets/button.hpp>
+#include <arbor/widgets/checkbox.hpp>
+#include <arbor/widgets/color-picker.hpp>
+#include <arbor/widgets/context-menu.hpp>
+#include <arbor/widgets/dropdown.hpp>
+#include <arbor/widgets/file-dialog.hpp>
+#include <arbor/widgets/number-input.hpp>
+#include <arbor/widgets/text-input.hpp>
+#include <arbor/widgets/text.hpp>
 #include "imgui-context.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -18,9 +18,47 @@
 
 using namespace ui;
 
+TEST_CASE("inherited font sizes refresh after edits and reparenting", "[fonts][inheritance]") {
+    ui_test::ImGuiContext context({320.0f, 180.0f});
+    ImFontConfig config;
+    config.SizePixels = 27.0f;
+    ImFont* alternate = ImGui::GetIO().Fonts->AddFontDefaultVector(&config);
+    ui_test::ImGuiContext::build_fonts();
+
+    ui_test::draw_window("font-size-inheritance", [&] {
+        Container first("first");
+        Container second("second");
+        first.style().font_size(18.0f);
+        second.style().font_size(12.0f);
+        auto& text = first.add<TextWidget>("text");
+        CHECK(text.font_size() == 18.0f);
+
+        // parent edits and reparenting must discard the size resolved by the previous query
+        first.style().font_size(24.0f);
+        CHECK(text.font_size() == 24.0f);
+        second.add(first.detach(text));
+        CHECK(text.font_size() == 12.0f);
+
+        text.style().font_size(30.0f);
+        second.style().font_size(40.0f);
+        CHECK(text.font_size() == 30.0f);
+        text.style().font_size(0.0f);
+        CHECK(text.font_size() == 40.0f);
+
+        // an unset size follows the current native font scope even after inheritance has been cached
+        second.style().font_size(0.0f);
+        const float native_size = text.font_size();
+        CHECK(native_size != alternate->LegacySize);
+        ImGui::PushFont(alternate, alternate->LegacySize);
+        CHECK(text.font_size() == alternate->LegacySize);
+        ImGui::PopFont();
+        CHECK(text.font_size() == native_size);
+    });
+}
+
 TEST_CASE("file font weights select real instances and cache them per context", "[fonts][weight]") {
     FontRegistry fonts;
-    Font* family = fonts.add("inter", std::filesystem::path(IMGUI_UI_ASSETS_DIR) / "fonts/Inter.ttf");
+    Font* family = fonts.add("inter", std::filesystem::path(ARBOR_ASSETS_DIR) / "fonts/Inter.ttf");
     ui_test::ImGuiContext first({320.0f, 180.0f});
     ImGui::GetIO().BackendFlags |= ImGuiBackendFlags_RendererHasTextures;
 
@@ -50,7 +88,7 @@ TEST_CASE("file font weights select real instances and cache them per context", 
 
 TEST_CASE("controls inherit managed font weights and invalidate text measurements", "[fonts][weight][widgets]") {
     Runtime runtime;
-    Font* family = runtime.fonts().add("inter", std::filesystem::path(IMGUI_UI_ASSETS_DIR) / "fonts/Inter.ttf");
+    Font* family = runtime.fonts().add("inter", std::filesystem::path(ARBOR_ASSETS_DIR) / "fonts/Inter.ttf");
     Surface surface = ui_test::make_surface(runtime);
     surface.set_primary_font(family);
     const ImGuiContextScope context(surface.imgui_context());
@@ -99,13 +137,13 @@ TEST_CASE("controls inherit managed font weights and invalidate text measurement
     text.update(1.0f);
     CHECK(text.font() == bold);
 
-    Font* replacement = runtime.fonts().add("replacement", std::filesystem::path(IMGUI_UI_ASSETS_DIR) / "fonts/Inter.ttf");
+    Font* replacement = runtime.fonts().add("replacement", std::filesystem::path(ARBOR_ASSETS_DIR) / "fonts/Inter.ttf");
     surface.set_primary_font(replacement);
     surface.frame();
     CHECK(controls[1]->font() == replacement->get(FontWeight::Bold));
 }
 
-#ifdef IMGUI_UI_TEST_NATIVE_FONTS
+#ifdef ARBOR_TEST_NATIVE_FONTS
 TEST_CASE("system fonts filter character coverage and resolve unavailable families", "[fonts][system]") {
     FontRegistry fonts;
     fonts.refresh();

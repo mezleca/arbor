@@ -1,5 +1,5 @@
-#include <imgui-ui/style/computed-style.hpp>
-#include <imgui-ui/style/theme.hpp>
+#include <arbor/style/computed-style.hpp>
+#include <arbor/style/theme.hpp>
 
 #include <imgui.h>
 
@@ -40,6 +40,7 @@ ComputedStyle::ComputedStyle() {
 
 PushState ComputedStyle::push(float opacity, ImFont* effective_font, float effective_font_size) const {
     ImGuiStyle& current = ImGui::GetStyle();
+    const float scale = dpi_scale();
     PushState state;
 
     state.font_pushed = effective_font != ImGui::GetFont() || effective_font_size != current.FontSizeBase;
@@ -55,17 +56,23 @@ PushState ComputedStyle::push(float opacity, ImFont* effective_font, float effec
         ++state.colors;
     };
 
-    const ImVec2 padding = m_padding.value.window_padding();
+    const ImVec2 padding = (m_padding.value * scale).window_padding();
     if (current.FramePadding.x != padding.x || current.FramePadding.y != padding.y) {
         push_var(ImGuiStyleVar_FramePadding, padding);
     }
 
-    if (current.FrameRounding != m_border_radius) push_var(ImGuiStyleVar_FrameRounding, m_border_radius);
+    if (current.FrameRounding != m_border_radius * scale) push_var(ImGuiStyleVar_FrameRounding, m_border_radius * scale);
     if (current.FrameBorderSize != 0.0F) push_var(ImGuiStyleVar_FrameBorderSize, 0.0F);
-    if (current.ScrollbarSize != m_scrollbar_size) push_var(ImGuiStyleVar_ScrollbarSize, m_scrollbar_size);
-    if (current.ScrollbarRounding != m_scrollbar_rounding) push_var(ImGuiStyleVar_ScrollbarRounding, m_scrollbar_rounding);
-    if (current.GrabMinSize != m_scrollbar_minimum_grab_size) push_var(ImGuiStyleVar_GrabMinSize, m_scrollbar_minimum_grab_size);
-    if (current.GrabRounding != m_scrollbar_grab_rounding) push_var(ImGuiStyleVar_GrabRounding, m_scrollbar_grab_rounding);
+    if (current.ScrollbarSize != m_scrollbar_size * scale) push_var(ImGuiStyleVar_ScrollbarSize, m_scrollbar_size * scale);
+    if (current.ScrollbarRounding != m_scrollbar_rounding * scale) {
+        push_var(ImGuiStyleVar_ScrollbarRounding, m_scrollbar_rounding * scale);
+    }
+    if (current.GrabMinSize != m_scrollbar_minimum_grab_size * scale) {
+        push_var(ImGuiStyleVar_GrabMinSize, m_scrollbar_minimum_grab_size * scale);
+    }
+    if (current.GrabRounding != m_scrollbar_grab_rounding * scale) {
+        push_var(ImGuiStyleVar_GrabRounding, m_scrollbar_grab_rounding * scale);
+    }
 
     const float alpha = current.Alpha * m_alpha * opacity;
     if (current.Alpha != alpha) push_var(ImGuiStyleVar_Alpha, alpha);

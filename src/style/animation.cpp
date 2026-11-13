@@ -1,6 +1,6 @@
-#include <imgui-ui/style/animation.hpp>
+#include <arbor/style/animation.hpp>
 
-#include <imgui-ui/style/state.hpp>
+#include <arbor/style/state.hpp>
 
 #include <utility>
 

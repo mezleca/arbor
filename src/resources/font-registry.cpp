@@ -1,6 +1,6 @@
-#include <imgui-ui/resources/font-registry.hpp>
+#include <arbor/resources/font-registry.hpp>
 #include "fonts/platform.hpp"
-#include <imgui-ui/imgui/context-scope.hpp>
+#include <arbor/imgui/context-scope.hpp>
 
 #include <misc/freetype/imgui_freetype.h>
 #include <stdexcept>
@@ -16,8 +16,6 @@ static ImFontConfig default_font_config() {
 
 Font::Font(std::filesystem::path location, ImFontConfig config)
     : m_sources{{std::move(location), config.FontNo}}, m_config(config) {}
-
-Font::Font(std::vector<FontSource> sources) : m_sources(std::move(sources)), m_config(default_font_config()) {}
 
 Font::Font(FontRegistry& registry, FontRequest request, std::vector<FontSource> sources)
     : m_sources(std::move(sources)), m_config(default_font_config()), m_registry(&registry), m_request(std::move(request)) {}
@@ -162,6 +160,21 @@ ImFont* FontReference::resolve(std::optional<FontWeight> weight, std::optional<F
     return m_font != nullptr ? m_font->get(weight, slant) : m_native_font;
 }
 
+Font* FontRegistry::find(std::string_view id) {
+    return const_cast<Font*>(static_cast<const FontRegistry&>(*this).find(id));
+}
+
+const Font* FontRegistry::find(std::string_view id) const {
+    const auto entry = m_assets.find(id);
+    return entry == m_assets.end() ? nullptr : entry->second.get();
+}
+
+void FontRegistry::release_context(ImGuiContext* context) {
+    for (const auto& [id, font] : m_assets) {
+        font->release_context(context);
+    }
+}
+
 Font* FontRegistry::add(std::string id, std::filesystem::path location) {
     return add(std::move(id), std::move(location), default_font_config());
 }
@@ -169,7 +182,7 @@ Font* FontRegistry::add(std::string id, std::filesystem::path location) {
 Font* FontRegistry::add(std::string id, std::filesystem::path location, ImFontConfig config) {
     if (Font* existing = find(id)) return existing;
 
-    return add_asset(std::move(id), std::make_unique<Font>(std::move(location), config));
+    return m_assets.emplace(std::move(id), std::make_unique<Font>(std::move(location), config)).first->second.get();
 }
 
 Font* FontRegistry::add(std::string id, const FontRequest& request) {
@@ -179,7 +192,6 @@ Font* FontRegistry::add(std::string id, const FontRequest& request) {
 }
 
 Font* FontRegistry::set(std::string id, const FontRequest& request) {
-
     auto sources = resolve(request);
     if (sources.empty()) return nullptr;
 
@@ -198,5 +210,5 @@ Font* FontRegistry::set(std::string id, const FontRequest& request) {
         existing->replace(std::move(next));
         return existing;
     }
-    return add_asset(std::move(id), std::make_unique<Font>(std::move(next)));
+    return m_assets.emplace(std::move(id), std::make_unique<Font>(std::move(next))).first->second.get();
 }

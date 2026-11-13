@@ -1,7 +1,7 @@
-#include <imgui-ui/resources/texture-registry.hpp>
-#include <imgui-ui/widgets/image.hpp>
-#include <imgui-ui/widgets/text-input.hpp>
-#include <imgui-ui/widgets/context-menu.hpp>
+#include <arbor/resources/texture-registry.hpp>
+#include <arbor/widgets/image.hpp>
+#include <arbor/widgets/text-input.hpp>
+#include <arbor/widgets/context-menu.hpp>
 #include "imgui-context.hpp"
 
 #include <catch2/catch_test_macros.hpp>

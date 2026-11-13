@@ -1,11 +1,11 @@
 #pragma once
 
-#include <imgui-ui/backends/backend.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/layout/geometry.hpp>
-#include <imgui-ui/runtime.hpp>
-#include <imgui-ui/tree/node.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/backends/backend.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/layout/geometry.hpp>
+#include <arbor/runtime.hpp>
+#include <arbor/tree/node.hpp>
+#include <arbor/surface.hpp>
 
 #include <imgui.h>
 
@@ -17,6 +17,8 @@
 namespace ui_test {
     class TestBackend final : public ui::Backend {
     public:
+        explicit TestBackend(float content_scale = 1.0f) : m_content_scale(content_scale) {}
+
         bool initialize() override {
             return true;
         }
@@ -30,10 +32,12 @@ namespace ui_test {
         void shutdown_imgui() override {}
         void begin_frame(ui::Color) override {}
         void set_mouse_cursor(ImGuiMouseCursor) override {}
-        void render(ImDrawData*) override {}
+        std::optional<double> render(ImDrawData*, bool) override {
+            return std::nullopt;
+        }
 
         float content_scale() const override {
-            return 1.0F;
+            return m_content_scale;
         }
 
         uint64_t window_id() const override {
@@ -43,6 +47,9 @@ namespace ui_test {
         ImVec2 display_size() const override {
             return {};
         }
+
+    private:
+        float m_content_scale;
     };
 
     inline std::unique_ptr<ui::Backend> make_backend() {

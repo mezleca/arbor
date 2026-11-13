@@ -42,6 +42,6 @@ Checks: >
   -portability-avoid-pragma-once,
   -concurrency-mt-unsafe,
 WarningsAsErrors: ''
-HeaderFilterRegex: '[/\\](include[/\\]imgui-ui|tests|examples)[/\\]'
+HeaderFilterRegex: '[/\\](include[/\\]arbor|tests|examples)[/\\]'
 ExcludeHeaderFilterRegex: 'vendor|build'
 FormatStyle: none

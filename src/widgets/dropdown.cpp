@@ -1,10 +1,10 @@
-#include <imgui-ui/widgets/dropdown.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
+#include <arbor/widgets/dropdown.hpp>
+#include <arbor/layout/layer-container.hpp>
 
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/button.hpp>
-#include <imgui-ui/widgets/text.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/button.hpp>
+#include <arbor/widgets/text.hpp>
 
 #include <algorithm>
 #include <imgui.h>
@@ -36,9 +36,10 @@ public:
         set_text_alignment({0.0F, 0.5F});
         refresh();
 
-        // each live option keeps its source index. count changes replace rows through deferred node removal.
         on_click([this] {
             if (m_owner.is_open()) {
+                // keep focus on the trigger because selecting this row closes its popup.
+                m_owner.surface().input_router().set_focus(&m_owner.trigger());
                 m_owner.select_value(m_owner.m_options[m_index].value);
             }
         });
@@ -57,14 +58,12 @@ public:
 
 protected:
     void apply_theme_defaults(const Theme& theme) override {
-        const float rounding = m_index == 0 || m_index + 1 == m_owner.m_options.size() ? theme.controls.rounding : 0.0F;
-
-        configure_all_styles([&theme, rounding](Style& style) {
+        configure_all_styles([&theme](Style& style) {
             style.color(theme.text_color)
                 .background_color(theme.transparent)
                 .padding({10.0F, 4.0F})
                 .border(BorderEdge{0.0F, BorderType::None})
-                .border_radius(rounding)
+                .border_radius(0.0f)
                 .cursor(ImGuiMouseCursor_Hand);
         });
 
@@ -98,8 +97,8 @@ private:
         const std::string_view text = preview();
         const ImVec2 text_size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
         set_measured_content_size(
-            {text_size.x + DropdownWidget::ARROW_SIZE.x + ImGui::GetStyle().ItemInnerSpacing.x,
-             std::max(text_size.y, DropdownWidget::ARROW_SIZE.y)}
+            {text_size.x + (DropdownWidget::ARROW_SIZE.x * dpi_scale()) + ImGui::GetStyle().ItemInnerSpacing.x,
+             std::max(text_size.y, DropdownWidget::ARROW_SIZE.y * dpi_scale())}
         );
     }
 
@@ -119,7 +118,7 @@ private:
         if (!children().empty()) return;
         const ComputedStyle& current_style = context.style;
         const std::string_view text = preview();
-        const ImVec2 text_size = ImGui::CalcTextSize(text.data(), text.data() + text.size());
+        const ImVec2 text_size = context.painter.text_size(text);
         const Rect content = context.content_rect;
 
         context.painter.text(
@@ -127,7 +126,7 @@ private:
         );
 
         context.painter.triangle(
-            {content.max.x - (DropdownWidget::ARROW_SIZE.x * 0.5F), content.min.y + (content.size().y * 0.5F)},
+            {content.max.x - (DropdownWidget::ARROW_SIZE.x * 0.5f), content.min.y + (content.size().y * 0.5f)},
             DropdownWidget::ARROW_SIZE, current_style.color().value,
             m_owner.is_open() ? TriangleDirection::Up : TriangleDirection::Down
         );
@@ -198,7 +197,11 @@ bool DropdownBody::paint() {
     }
 
     const Rect trigger_rect = m_owner.m_trigger->layout().visual_rect();
-    set_popup_position({trigger_rect.min.x, trigger_rect.max.y + DropdownWidget::POPUP_GAP});
+    const ImVec2 position = {trigger_rect.min.x, trigger_rect.max.y + (DropdownWidget::POPUP_GAP * dpi_scale())};
+
+    // option lists shrink below their trigger. other popups can reposition to preserve their controls' preferred size.
+    assign_size({layout().size().x, std::min(layout().size().y, std::max(0.0f, viewport_work_area().max.y - position.y))});
+    set_popup_position(position);
     if (LayerContainer::paint()) {
         const Rect body_rect = layout().visual_rect();
 
@@ -297,15 +300,18 @@ DropdownWidget::DropdownWidget(
 
 void DropdownWidget::event(UiEvent& event) {
     if (event.type == EventType::KeyDown) {
-        if (event.key == Key::Escape && is_open()) {
+        // a visible dropdown also receives keyboard broadcasts meant for other inputs.
+        if (!contains(surface().input_router().focused_node())) return;
+
+        if (event.key == ImGuiKey_Escape && is_open()) {
             close();
         } else if (
             (event.target == m_trigger || m_option_list->contains(event.target)) &&
-            (event.key == Key::Down || event.key == Key::Up)
+            (event.key == ImGuiKey_DownArrow || event.key == ImGuiKey_UpArrow)
         ) {
             if (!is_open()) open();
-            navigate(event.key == Key::Down ? 1 : -1);
-        } else if (event.target == m_trigger && event.key == Key::Enter) {
+            navigate(event.key == ImGuiKey_DownArrow ? 1 : -1);
+        } else if (event.target == m_trigger && event.key == ImGuiKey_Enter) {
             open();
             navigate(1);
         } else {

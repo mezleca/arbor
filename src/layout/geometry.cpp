@@ -1,9 +1,22 @@
-#include <imgui-ui/layout/geometry.hpp>
+#include <arbor/layout/geometry.hpp>
 
 #include <algorithm>
 #include <cmath>
 
 using namespace ui;
+
+Placement NodeLayout::active_placement() const {
+    if (m_has_arranged_position) return m_arranged_placement;
+
+    Placement placement = m_config.placement;
+    placement.offset.x *= dpi_scale();
+    placement.offset.y *= dpi_scale();
+    return placement;
+}
+
+float ui::dpi_scale() {
+    return ImGui::GetCurrentContext() != nullptr ? ImGui::GetStyle().FontScaleDpi : 1.0f;
+}
 
 static float constrain_extent(float size, float minimum, float maximum, float insets, BoxSizing box_sizing) {
     const float padding = box_sizing == BoxSizing::ContentBox ? insets : 0.0F;
@@ -21,19 +34,19 @@ Rect ui::viewport_work_area() {
 }
 
 float LayoutLimit::resolve(float available) const {
-    return percentage ? std::max(0.0F, available) * value / 100.0F : value;
+    return percentage ? std::max(0.0f, available) * value / 100.0f : value * dpi_scale();
 }
 
 float LayoutAxis::intrinsic(float measured, float insets, BoxSizing box_sizing) const {
     float size = mode == LayoutSizeMode::Percent ? 0.0F : measured;
     if (mode == LayoutSizeMode::Fixed) {
-        size = value + (box_sizing == BoxSizing::ContentBox ? insets : 0.0F);
+        size = (value * dpi_scale()) + (box_sizing == BoxSizing::ContentBox ? insets : 0.0f);
     }
 
     // percentage limits cannot participate in measurement of an unresolved parent. pixels still limit its fit size.
     return constrain_extent(
-        size, minimum.percentage ? 0.0F : minimum.value,
-        maximum.percentage ? std::numeric_limits<float>::infinity() : maximum.value, insets, box_sizing
+        size, minimum.percentage ? 0.0f : minimum.value * dpi_scale(),
+        maximum.percentage ? std::numeric_limits<float>::infinity() : maximum.value * dpi_scale(), insets, box_sizing
     );
 }
 
@@ -42,7 +55,7 @@ float LayoutAxis::resolve(float measured, float available, float insets, BoxSizi
 
     float size = std::max(0.0F, available);
     if (mode == LayoutSizeMode::Fixed)
-        size = value;
+        size = value * dpi_scale();
     else if (mode == LayoutSizeMode::Fit)
         size = measured;
     else if (mode == LayoutSizeMode::Percent)

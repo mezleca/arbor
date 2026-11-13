@@ -1,40 +1,39 @@
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/imgui/paint-state.hpp>
-#include <imgui-ui/imgui/effects/blur/blur.hpp>
-#include <imgui-ui/imgui/effects/gradient/gradient.hpp>
-#include <imgui-ui/imgui/effects/shadow/shadow.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/imgui/paint-state.hpp>
+#include <arbor/imgui/effects/blur/blur.hpp>
+#include <arbor/imgui/effects/gradient/gradient.hpp>
+#include <arbor/imgui/effects/shadow/shadow.hpp>
 
 #include <algorithm>
+#include <cmath>
 
 using namespace ui;
 
 void Painter::draw_full_frame(Rect rect, const ComputedStyle& style, ImColor background, ImColor border) const {
-    const float border_thickness = style.border_thickness();
+    const float border_thickness = style.border_thickness() * m_scale;
+    const float rounding = style.border_radius() * m_scale;
     if (border_thickness <= 0.0F) {
-        m_draw_list.AddRectFilled(rect.min, rect.max, background, style.border_radius());
+        m_draw_list.AddRectFilled(rect.min, rect.max, background, rounding);
         return;
     }
 
-    const float inset = border_thickness * BORDER_STROKE_INSET_SCALE;
     m_draw_list.AddRectFilled(
         {rect.min.x + border_thickness, rect.min.y + border_thickness},
-        {rect.max.x - border_thickness, rect.max.y - border_thickness}, background,
-        std::max(0.0F, style.border_radius() - border_thickness)
+        {rect.max.x - border_thickness, rect.max.y - border_thickness}, background, std::max(0.0f, rounding - border_thickness)
     );
-    m_draw_list.AddRect(
-        {rect.min.x + inset, rect.min.y + inset}, {rect.max.x - inset, rect.max.y - inset}, border, style.border_radius(),
-        border_thickness
-    );
+    m_draw_list.AddRect(rect.min, rect.max, border, rounding, border_thickness);
 }
 
 void Painter::frame_surface(Rect rect, const ComputedStyle& style, const std::optional<Color>& background_override) const {
+    const Rect native_rect = to_screen(rect);
+    const float rounding = style.border_radius() * m_scale;
     const Color& background_color = background_override ? *background_override : style.background_color().value;
     ImColor background = color(background_color);
     const Color& border_color = style.border_color().value;
     const ImColor draw_border_color = color(border_color);
 
     if (m_effects != nullptr && background_color.gradient() != nullptr &&
-        draw_gradient_rect(*m_effects, m_draw_list, rect, background_color, style.border_radius(), m_alpha)) {
+        draw_gradient_rect(*m_effects, m_draw_list, native_rect, background_color, rounding, m_alpha)) {
         background.Value.w = 0.0F;
     }
 
@@ -44,22 +43,22 @@ void Painter::frame_surface(Rect rect, const ComputedStyle& style, const std::op
         ImColor frame_border = draw_border_color;
         if (gradient_border) frame_border.Value.w = 0.0F;
 
-        draw_full_frame(rect, style, background, frame_border);
+        draw_full_frame(native_rect, style, background, frame_border);
         if (gradient_border &&
             !draw_gradient_rect(
-                *m_effects, m_draw_list, rect, border_color, style.border_radius(), m_alpha, style.border_thickness()
+                *m_effects, m_draw_list, native_rect, border_color, rounding, m_alpha, style.border_thickness() * m_scale
             )) {
             border(rect, style, border_color);
         }
         return;
     }
 
-    m_draw_list.AddRectFilled(rect.min, rect.max, background, style.border_radius());
+    m_draw_list.AddRectFilled(native_rect.min, native_rect.max, background, rounding);
     border(rect, style, border_color);
 }
 
 void Painter::frame_effects(Rect rect, const ComputedStyle& style) const {
-    if (m_effects == nullptr) return;
+    if (m_effects == nullptr || m_alpha <= 0.0f || (style.blur() == 0 && style.box_shadow().color.max_alpha() <= 0.0f)) return;
 
     const ImVec2 clip_min = m_draw_list.GetClipRectMin();
     const ImVec2 clip_max = m_draw_list.GetClipRectMax();
@@ -77,13 +76,19 @@ void Painter::frame_effects(Rect rect, const ComputedStyle& style) const {
 
 void Painter::blur(Rect rect, const ComputedStyle& style) const {
     if (m_effects != nullptr && style.blur() > 0) {
-        draw_blur(*m_effects, m_draw_list, rect, style.blur(), style.border_radius(), m_alpha);
+        const int radius = static_cast<int>(std::lround(static_cast<float>(style.blur()) * m_scale));
+        draw_blur(*m_effects, m_draw_list, to_screen(rect), radius, style.border_radius() * m_scale, m_alpha);
     }
 }
 
 void Painter::shadow(Rect rect, const ComputedStyle& style) const {
     if (m_effects != nullptr && style.box_shadow().color.max_alpha() > 0.0F) {
-        draw_box_shadow(*m_effects, m_draw_list, rect, style.box_shadow(), style.border_radius(), m_alpha);
+        BoxShadow shadow = style.box_shadow();
+        shadow.offset.x *= m_scale;
+        shadow.offset.y *= m_scale;
+        shadow.blur *= m_scale;
+        shadow.spread *= m_scale;
+        draw_box_shadow(*m_effects, m_draw_list, to_screen(rect), shadow, style.border_radius() * m_scale, m_alpha);
     }
 }
 

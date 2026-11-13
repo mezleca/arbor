@@ -1,9 +1,9 @@
-#include <imgui-ui/backends/raylib/backend.hpp>
+#include <arbor/backends/raylib/backend.hpp>
 
-#include <imgui-ui/constants.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/imgui/effects/opengl.hpp>
-#include <imgui-ui/surface.hpp>
+#include <arbor/constants.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
+#include <arbor/surface.hpp>
 
 #include <external/glad.h>
 #include <imgui_impl_opengl3.h>
@@ -155,29 +155,6 @@ static constexpr std::array RAYLIB_KEYS = {
     RaylibKeyMapping{KEY_F12, ImGuiKey_F12},
 };
 
-static Key core_key(int key) {
-    switch (key) {
-        case KEY_ESCAPE:
-            return Key::Escape;
-        case KEY_ENTER:
-            return Key::Enter;
-        case KEY_TAB:
-            return Key::Tab;
-        case KEY_LEFT:
-            return Key::Left;
-        case KEY_RIGHT:
-            return Key::Right;
-        case KEY_UP:
-            return Key::Up;
-        case KEY_DOWN:
-            return Key::Down;
-        case KEY_SPACE:
-            return Key::Space;
-        default:
-            return Key::Unknown;
-    }
-}
-
 static ::Color raylib_color(ImVec4 color) {
     return {
         static_cast<unsigned char>(std::clamp(color.x, 0.0F, 1.0F) * 255.0F),
@@ -247,11 +224,7 @@ void RaylibBackend::apply_mouse_cursor() const {
     ShowCursor();
 }
 
-void RaylibBackend::render(ImDrawData* draw_data) {
-    render_profiled(draw_data, false);
-}
-
-std::optional<double> RaylibBackend::render_profiled(ImDrawData* draw_data, bool profile_gpu) {
+std::optional<double> RaylibBackend::render(ImDrawData* draw_data, bool profile_gpu) {
     rlDrawRenderBatchActive();
     const std::optional<double> gpu_ms = m_gpu_timer.begin(profile_gpu);
     ImGui_ImplOpenGL3_RenderDrawData(draw_data);
@@ -352,7 +325,7 @@ void RaylibBackend::process_events(Surface& surface) {
         if (!pressed && !released) continue;
 
         UiEvent event = UiEvent::make(pressed ? EventType::KeyDown : EventType::KeyUp);
-        event.key = core_key(mapping.raylib_key);
+        event.key = mapping.imgui_key;
         surface.dispatch(event);
     }
 

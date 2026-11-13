@@ -1,9 +1,10 @@
-#include <imgui-ui/imgui/effects/gradient/opengl.hpp>
+#include <arbor/imgui/effects/gradient/opengl.hpp>
+#include <arbor/imgui/effects/clip/opengl.hpp>
 
-#include <imgui-ui/imgui/effects/gradient/gradient.hpp>
-#include <imgui-ui/imgui/effects/gradient/opengl-shared.hpp>
-#include <imgui-ui/imgui/effects/effects.hpp>
-#include <imgui-ui/imgui/effects/opengl.hpp>
+#include <arbor/imgui/effects/gradient/gradient.hpp>
+#include <arbor/imgui/effects/gradient/opengl-shared.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
 
 #include <algorithm>
 #include <string>
@@ -49,13 +50,13 @@ void main() {
         coverage *= smoothstep(-antialias, antialias, inner);
     }
     vec4 sampled = sample_color(point, shape);
-    color = vec4(sampled.rgb, sampled.a * coverage * opacity);
+    color = vec4(sampled.rgb, sampled.a * coverage * opacity * clip_coverage());
 }
 )";
 
 static bool initialize(void*) {
     auto& state = states[ImGui::GetCurrentContext()];
-    const std::string shader = std::string{"#version 330 core\n"} + GRADIENT_SAMPLER_GLSL + FRAGMENT_BODY;
+    const std::string shader = std::string{"#version 330 core\n"} + CLIP_GLSL + GRADIENT_SAMPLER_GLSL + FRAGMENT_BODY;
     if (!state.effect.initialize(shader.c_str())) return false;
     const GLuint program = state.effect.program();
     state.sampler = find_gradient_uniforms(program);
@@ -88,6 +89,7 @@ static void render(void*, const ImDrawList*, const ImDrawCmd* command, const voi
     glUniform1f(state.height, height);
     glUniform1f(state.opacity, region.opacity);
     upload_gradient(state.sampler, {}, region.gradient);
+    apply_opengl_clip(state.effect.program());
     OpenGlFullscreenEffect::draw();
 }
 

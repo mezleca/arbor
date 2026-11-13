@@ -1,10 +1,10 @@
-#include <imgui-ui/widgets/context-menu.hpp>
+#include <arbor/widgets/context-menu.hpp>
 
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/resources/texture-registry.hpp>
-#include <imgui-ui/runtime.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/resources/texture-registry.hpp>
+#include <arbor/runtime.hpp>
 
 #include <algorithm>
 #include <utility>
@@ -57,7 +57,7 @@ private:
 
     void paint_content(const PaintContext& context) override {
         const Rect content = context.content_rect;
-        const ImVec2 text_size = ImGui::CalcTextSize(m_label.c_str());
+        const ImVec2 text_size = context.painter.text_size(m_label);
         context.painter.text(
             {content.min.x, content.min.y + ((content.size().y - text_size.y) * 0.5F)}, context.style.color().value, m_label
         );
@@ -69,7 +69,7 @@ private:
 
     void draw_submenu_icon(const PaintContext& context) const {
         const Rect content = context.content_rect;
-        const float icon_size = std::min(13.0F, std::min(content.size().x, content.size().y));
+        const float icon_size = std::min(13.0f, std::min(content.size().x, content.size().y));
         const Rect icon = Rect::from_position_size(
             {content.max.x - icon_size, content.min.y + ((content.size().y - icon_size) * 0.5F)}, {icon_size, icon_size}
         );
@@ -82,10 +82,11 @@ private:
             return;
         }
 
-        const ImTextureID texture = m_menu.m_submenu_icon->get(icon.size());
+        const Rect native_icon = context.painter.to_screen(icon);
+        const ImTextureID texture = m_menu.m_submenu_icon->get(native_icon.size());
         context.painter.draw_list().AddImageQuad(
-            texture, icon.min, {icon.max.x, icon.min.y}, icon.max, {icon.min.x, icon.max.y}, {0, 1}, {0, 0}, {1, 0}, {1, 1},
-            context.style.color().get_col()
+            texture, native_icon.min, {native_icon.max.x, native_icon.min.y}, native_icon.max,
+            {native_icon.min.x, native_icon.max.y}, {0, 1}, {0, 0}, {1, 0}, {1, 1}, context.style.color().get_col()
         );
     }
 

@@ -1,4 +1,4 @@
-#include <imgui-ui/diagnostics/profiler.hpp>
+#include <arbor/diagnostics/profiler.hpp>
 
 #include <algorithm>
 #include <chrono>

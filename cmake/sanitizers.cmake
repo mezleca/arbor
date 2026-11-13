@@ -1,4 +1,4 @@
-if(NOT IMGUI_UI_ENABLE_SANITIZERS)
+if(NOT ARBOR_ENABLE_SANITIZERS)
     return()
 endif()
 
@@ -8,7 +8,7 @@ if(MSVC)
     string(REGEX REPLACE "/RTC[1su]+" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 
-function(imgui_ui_enable_sanitizers target)
+function(arbor_enable_sanitizers target)
     if(MSVC)
         target_compile_options(${target} PUBLIC "$<$<CONFIG:Debug>:/fsanitize=address>")
         # dependencies are not built with asan. disable stl container annotations across their link boundary.

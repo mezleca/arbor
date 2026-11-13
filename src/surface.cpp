@@ -1,19 +1,27 @@
-#include <imgui-ui/surface.hpp>
+#include <arbor/surface.hpp>
 
-#include <imgui-ui/diagnostics/profiler.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/diagnostics/debugger.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/layout/resizable-container.hpp>
-#include <imgui-ui/runtime.hpp>
-#include <imgui-ui/style/theme.hpp>
+#include <arbor/diagnostics/profiler.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/diagnostics/debugger.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/layout/resizable-container.hpp>
+#include <arbor/runtime.hpp>
+#include <arbor/style/theme.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <imgui_internal.h>
 #include <stdexcept>
 #include <utility>
 
 using namespace ui;
+
+static void invalidate_measurements(Node& node) {
+    node.invalidate_measure();
+    for (const auto& child : node.children()) {
+        invalidate_measurements(*child);
+    }
+}
 
 class SurfaceContent final : public ResizableContainer {
 public:
@@ -60,14 +68,20 @@ void Surface::process_events() {
     m_backend->process_events(*this);
 }
 
+void Surface::set_scale(float scale) {
+    if (!std::isfinite(scale) || scale <= 0.0f) {
+        throw std::invalid_argument("surface scale must be finite and positive");
+    }
+
+    m_scale = scale;
+}
+
 void Surface::set_theme(Theme theme) {
     m_theme = std::move(theme);
 
     const ImGuiContextScope scope(m_context);
 
-    apply_theme_metrics();
-    apply_theme_colors();
-
+    configure_style(m_content_scale);
     m_root->apply_theme(m_theme);
 }
 
@@ -117,6 +131,7 @@ void Surface::initialize(bool enable_debugger) {
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
+    io.Fonts->Flags |= ImFontAtlasFlags_NoBakedRoundCorners;
     io.Fonts->AddFontDefaultVector();
 
     configure_style(m_backend->content_scale());
@@ -147,42 +162,32 @@ void Surface::initialize(bool enable_debugger) {
     }
 }
 
-void Surface::configure_style(float main_scale) {
-    ImGui::StyleColorsDark();
-
-    m_content_scale = main_scale;
+void Surface::configure_style(float scale) {
+    // imgui rounds scaled style dimensions. rebuild unscaled defaults to avoid accumulating that rounding across zoom changes.
     ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(main_scale);
-    style.FontScaleDpi = main_scale;
+    style = ImGuiStyle{};
+    m_content_scale = scale;
 
-    apply_theme_metrics();
-    apply_theme_colors();
-}
-
-void Surface::apply_theme_metrics() {
-    ImGuiStyle& style = ImGui::GetStyle();
     const Theme& theme = m_theme;
-    const float scale = m_content_scale;
-    const auto scaled = [scale](float value) { return std::max(0.0F, value) * scale; };
-    const auto scaled_size = [scale](ImVec2 value) {
-        return ImVec2{std::max(0.0F, value.x) * scale, std::max(0.0F, value.y) * scale};
-    };
+    const auto nonnegative = [](float value) { return std::max(0.0f, value); };
+    const auto nonnegative_size = [](ImVec2 value) { return ImVec2{std::max(0.0f, value.x), std::max(0.0f, value.y)}; };
 
-    style.WindowRounding = scaled(theme.metrics.window_rounding);
-    style.ChildRounding = scaled(theme.metrics.child_rounding);
-    style.PopupRounding = scaled(theme.metrics.popup_rounding);
-    style.TabRounding = scaled(theme.metrics.tab_rounding);
-    style.WindowPadding = scaled_size(theme.metrics.window_padding);
-    style.CellPadding = scaled_size(theme.metrics.cell_padding);
-    style.FramePadding = scaled_size(theme.metrics.frame_padding);
-    style.FrameRounding = scaled(theme.controls.rounding);
-    style.FrameBorderSize = scaled(theme.metrics.frame_border_size);
-    style.ItemSpacing = scaled_size(theme.metrics.item_spacing);
-    style.ItemInnerSpacing = scaled_size(theme.metrics.item_inner_spacing);
+    style.WindowRounding = nonnegative(theme.metrics.window_rounding);
+    style.ChildRounding = nonnegative(theme.metrics.child_rounding);
+    style.PopupRounding = nonnegative(theme.metrics.popup_rounding);
+    style.TabRounding = nonnegative(theme.metrics.tab_rounding);
+    style.WindowPadding = nonnegative_size(theme.metrics.window_padding);
+    style.CellPadding = nonnegative_size(theme.metrics.cell_padding);
+    style.FramePadding = nonnegative_size(theme.metrics.frame_padding);
+    style.FrameRounding = nonnegative(theme.controls.rounding);
+    style.FrameBorderSize = nonnegative(theme.metrics.frame_border_size);
+    style.ItemSpacing = nonnegative_size(theme.metrics.item_spacing);
+    style.ItemInnerSpacing = nonnegative_size(theme.metrics.item_inner_spacing);
     style.CircleTessellationMaxError = std::max(0.0F, theme.metrics.circle_tessellation_max_error);
-#if IMGUI_VERSION_NUM < 19300
-    style.AntiAliasedLinesUseTex = theme.metrics.anti_aliased_lines_use_tex;
-#endif
+
+    style.ScaleAllSizes(scale);
+    style.FontScaleDpi = scale;
+    apply_theme_colors();
 }
 
 void Surface::apply_theme_colors() {
@@ -251,8 +256,17 @@ void Surface::begin_frame() {
     m_input_router.begin_frame();
     m_profiler->begin_frame();
 
+    m_paint_state.begin_frame();
     m_effects.begin_frame();
+    const ImVec2 previous_density = ImGui::GetIO().DisplayFramebufferScale;
     m_backend->begin_frame(m_theme.background_color);
+
+    const float scale = m_scale * m_backend->content_scale();
+    const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
+    if (scale != m_content_scale || density.x != previous_density.x || density.y != previous_density.y) {
+        configure_style(scale);
+        invalidate_measurements(*m_root);
+    }
 
     ImGui::NewFrame();
 
@@ -274,10 +288,14 @@ void Surface::update(float dt) {
 
 void Surface::draw() {
     m_root->draw();
+    m_paint_state.finish_frame(m_effects);
 }
 
 void Surface::end_frame() {
     m_backend->set_mouse_cursor(ImGui::GetMouseCursor());
+
+    // external drawing can add clipped lists after draw() has finalized the root's output.
+    m_paint_state.finish_frame(m_effects);
 
     // finalize imgui draw data before the backend renders it and closes the draw cycle.
     ImGui::Render();
@@ -293,7 +311,7 @@ void Surface::end_frame() {
 
     {
         UI_PROFILE_SCOPE(m_profiler.get(), "Surface::render");
-        m_profiler->record_gpu_render_ms(m_backend->render_profiled(draw_data, m_profiler->enabled()));
+        m_profiler->record_gpu_render_ms(m_backend->render(draw_data, m_profiler->enabled()));
     }
 
     // draw data has been consumed. texture collection must run before leaving this surface's graphics context.

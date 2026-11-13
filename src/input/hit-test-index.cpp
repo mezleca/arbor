@@ -1,6 +1,6 @@
-#include <imgui-ui/input/hit-test-index.hpp>
+#include <arbor/input/hit-test-index.hpp>
 
-#include <imgui-ui/tree/node.hpp>
+#include <arbor/tree/node.hpp>
 
 #include <imgui_internal.h>
 
@@ -66,25 +66,31 @@ void HitTestIndex::erase_subtree(Node& subtree) {
 HitTestIndex::Route HitTestIndex::route_at(ImVec2 position, EventType type) const {
     Route route;
     const EventMask mask = event_mask(type);
-    // select the front blocker before collecting targets in its subtree.
-    for (auto it = m_entries.rbegin(); it != m_entries.rend(); ++it) {
-        ++m_checks;
-        if (it->kind != EntryKind::Blocker || !it->rect.contains(position) || !contains(it->events, mask)) continue;
-        // blockers ignore the owner's visual input state, but still require an enabled, visible branch.
-        if (it->node != nullptr && !it->node->Node::accepts_input()) continue;
-
-        route.blocker = *it;
-        break;
-    }
-
-    Node* scope = route.blocker ? route.blocker->node : nullptr;
-    if (route.blocker && scope == nullptr) return route;
+    Node* scope = nullptr;
 
     for (auto it = m_entries.rbegin(); it != m_entries.rend(); ++it) {
         ++m_checks;
-        if (it->kind != EntryKind::Target || it->node == nullptr || !it->rect.contains(position) || !contains(it->events, mask) ||
-            !it->node->accepts_input() || (scope != nullptr && !scope->contains(it->node)))
+        if (!it->rect.contains(position) || !contains(it->events, mask)) continue;
+
+        if (it->kind == EntryKind::Blocker) {
+            // only the front blocker sets the scope, even when its owner's visual hit area is disabled.
+            if (route.blocker || (it->node != nullptr && !it->node->Node::accepts_input())) continue;
+
+            route.blocker = *it;
+            scope = it->node;
+            if (scope == nullptr) {
+                route.targets.clear();
+                return route;
+            }
+
+            // children may register before their blocking parent, so keep scanning after filtering unrelated hits.
+            std::erase_if(route.targets, [scope](const Entry& entry) { return !scope->contains(entry.node); });
             continue;
+        }
+
+        if (it->node == nullptr || !it->node->accepts_input() || (scope != nullptr && !scope->contains(it->node))) {
+            continue;
+        }
 
         // parent geometry is finalized after its children. keep only the deepest hit node of each branch for bubbling.
         const auto related = std::ranges::find_if(route.targets, [&](const Entry& entry) {

@@ -1,9 +1,9 @@
-#include <imgui-ui/widgets/file-dialog.hpp>
+#include <arbor/widgets/file-dialog.hpp>
 
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/text.hpp>
-#include <imgui-ui/widgets/button.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/text.hpp>
+#include <arbor/widgets/button.hpp>
 
 using namespace ui;
 

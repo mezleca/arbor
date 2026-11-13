@@ -1,4 +1,4 @@
-#include <imgui-ui/imgui/border.hpp>
+#include <arbor/imgui/border.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -9,7 +9,7 @@ using namespace ui;
 static constexpr float PI = std::numbers::pi_v<float>;
 static constexpr float QUARTER_PI = PI * 0.25F;
 static constexpr float HALF_PI = PI * 0.5F;
-static constexpr float ARC_MAX_ERROR = 0.25F; // maximum sagitta error, matching imgui adaptive circle tessellation model.
+static constexpr float ARC_MAX_ERROR = 0.05f;
 
 static bool is_selected(const BorderPathSegment& segment, uint8_t border) {
     return (segment.sides & border) != 0;
@@ -38,8 +38,10 @@ static float arc_max_step(const BorderPathSegment& segment) {
     return radius <= ARC_MAX_ERROR ? sweep : 2.0F * std::acos(std::clamp(1.0F - (ARC_MAX_ERROR / radius), -1.0F, 1.0F));
 }
 
-static void
-append_segment_range(ImDrawList& draw_list, const BorderPathSegment& segment, float start, float end, float max_step = 0.0F) {
+static void append_segment_range(
+    ImDrawList& draw_list, const BorderPathSegment& segment, float start, float end, float max_step = 0.0f,
+    bool include_end = true
+) {
     if (end <= start) {
         return;
     }
@@ -55,7 +57,8 @@ append_segment_range(ImDrawList& draw_list, const BorderPathSegment& segment, fl
     }
 
     const int steps = std::max(1, static_cast<int>(std::ceil(sweep * (end - start) / segment.length / max_step)));
-    for (int step = 1; step <= steps; ++step) {
+    const int final_step = include_end ? steps : steps - 1;
+    for (int step = 1; step <= final_step; ++step) {
         const float distance = std::lerp(start, end, static_cast<float>(step) / static_cast<float>(steps));
         draw_list.PathLineToMergeDuplicate(point_at(segment, distance));
     }
@@ -121,6 +124,8 @@ static bool walk_side_segments(const BorderPath& path, uint8_t side, OnSegment&&
 
 static void stroke_solid_path(ImDrawList& draw_list, const BorderPath& path, uint8_t border, ImU32 color, float thickness) {
     bool has_path = false;
+    const bool closed = border == BORDER_ALL;
+    const ImDrawFlags flags = closed ? ImDrawFlags_Closed | ImDrawFlags_StrokeInside : ImDrawFlags_None;
 
     walk_selected_segments(
         path, border,
@@ -129,11 +134,11 @@ static void stroke_solid_path(ImDrawList& draw_list, const BorderPath& path, uin
                 draw_list.PathLineTo(segment.start);
                 has_path = true;
             }
-            append_segment_range(draw_list, segment, 0.0F, segment.length);
+            append_segment_range(draw_list, segment, 0.0f, segment.length, 0.0f, !closed || &segment != &path.back());
         },
         [&] {
             if (has_path) {
-                draw_list.PathStroke(color, thickness);
+                draw_list.PathStroke(color, thickness, flags);
                 has_path = false;
             }
         }

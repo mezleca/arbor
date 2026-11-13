@@ -1,8 +1,8 @@
 #include "../demo.hpp"
 
-#include <imgui-ui/backends/raylib/backend.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/runtime.hpp>
+#include <arbor/backends/raylib/backend.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/runtime.hpp>
 #include <raylib.h>
 #include <memory>
 #include <utility>
@@ -11,7 +11,7 @@ using namespace ui;
 
 int main() {
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(1120, 920, "imgui-ui raylib");
+    InitWindow(1120, 920, "arbor raylib");
 
     // destroy the surface before destroying the application-owned graphics context.
     {

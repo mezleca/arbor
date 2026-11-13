@@ -1,4 +1,4 @@
-#include <imgui-ui/style/style.hpp>
+#include <arbor/style/style.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -163,7 +163,7 @@ Style& Style::border_color(Color value, TransitionSpec transition) {
 }
 
 Style& Style::border_radius(float value) {
-    return set_property(&Style::m_border_radius, std::max(0.0F, value));
+    return set_property(&Style::m_border_radius, std::max(0.0f, value), false);
 }
 
 Style& Style::border_thickness(float value, TransitionSpec transition) {
@@ -240,11 +240,11 @@ Style& Style::box_shadow(BoxShadow value, TransitionSpec transition) {
         value.color = solid;
     }
 
-    return set_animated_transition(&Style::m_box_shadow, std::move(value), transition);
+    return set_animated_transition(&Style::m_box_shadow, std::move(value), transition, false);
 }
 
 Style& Style::blur(int value) {
-    return set_property(&Style::m_blur, std::clamp(value, 0, MAX_BLUR_STRENGTH));
+    return set_property(&Style::m_blur, std::clamp(value, 0, MAX_BLUR_STRENGTH), false);
 }
 
 Style& Style::scrollbar(const Theme::Scrollbar& value) {
@@ -263,40 +263,38 @@ Style& Style::scrollbar_size(float value) {
 }
 
 Style& Style::scrollbar_rounding(float value) {
-    return set_property(&Style::m_scrollbar_rounding, std::max(0.0F, value));
+    return set_property(&Style::m_scrollbar_rounding, std::max(0.0f, value), false);
 }
 
 Style& Style::scrollbar_minimum_grab_size(float value) {
-    return set_property(&Style::m_scrollbar_minimum_grab_size, std::max(1.0F, value));
+    return set_property(&Style::m_scrollbar_minimum_grab_size, std::max(1.0f, value), false);
 }
 
 Style& Style::scrollbar_grab_rounding(float value) {
-    return set_property(&Style::m_scrollbar_grab_rounding, std::max(0.0F, value));
+    return set_property(&Style::m_scrollbar_grab_rounding, std::max(0.0f, value), false);
 }
 
 Style& Style::scrollbar_background_color(Color value, TransitionSpec transition) {
-    return set_animated_transition(&Style::m_scrollbar_background_color, std::move(value), transition);
+    return set_animated_transition(&Style::m_scrollbar_background_color, std::move(value), transition, false);
 }
 
 Style& Style::scrollbar_grab_color(Color value, TransitionSpec transition) {
-    return set_animated_transition(&Style::m_scrollbar_grab_color, std::move(value), transition);
+    return set_animated_transition(&Style::m_scrollbar_grab_color, std::move(value), transition, false);
 }
 
 Style& Style::scrollbar_grab_hovered_color(Color value, TransitionSpec transition) {
-    return set_animated_transition(&Style::m_scrollbar_grab_hovered_color, std::move(value), transition);
+    return set_animated_transition(&Style::m_scrollbar_grab_hovered_color, std::move(value), transition, false);
 }
 
 Style& Style::scrollbar_grab_active_color(Color value, TransitionSpec transition) {
-    return set_animated_transition(&Style::m_scrollbar_grab_active_color, std::move(value), transition);
+    return set_animated_transition(&Style::m_scrollbar_grab_active_color, std::move(value), transition, false);
 }
 
 bool Style::lerp(Style& style, const Style& target, float dt) {
-    const FontReference previous_font = style.m_font;
-    const auto previous_font_weight = style.m_font_weight;
-    const auto previous_font_slant = style.m_font_slant;
-    const float previous_font_size = style.m_font_size;
-    const BoxSizing previous_box_sizing = style.m_box_sizing;
-    const LayoutSize previous_size = style.m_size;
+    const bool font_changed = style.m_font != target.m_font || style.m_font_size != target.m_font_size ||
+                              style.m_font_weight != target.m_font_weight || style.m_font_slant != target.m_font_slant;
+    bool measure_changed = style.m_size != target.m_size || style.m_box_sizing != target.m_box_sizing ||
+                           style.m_border_types != target.m_border_types;
 
     style.m_font = target.m_font;
     style.m_font_weight = target.m_font_weight;
@@ -306,7 +304,6 @@ bool Style::lerp(Style& style, const Style& target, float dt) {
     style.m_overflow = target.m_overflow;
     style.m_size = target.m_size;
     style.m_size_transition = target.m_size_transition;
-    bool measure_changed = previous_size != style.m_size;
     style.m_alpha = target.m_alpha;
     style.m_cursor = target.m_cursor;
     style.m_scrollbar_size = target.m_scrollbar_size;
@@ -315,7 +312,6 @@ bool Style::lerp(Style& style, const Style& target, float dt) {
     style.m_scrollbar_grab_rounding = target.m_scrollbar_grab_rounding;
     style.m_blur = target.m_blur;
     style.m_border_radius = target.m_border_radius;
-    if (style.m_border_types != target.m_border_types) measure_changed = true;
     style.m_border_types = target.m_border_types;
 
     bool transitioning = false;
@@ -363,9 +359,7 @@ bool Style::lerp(Style& style, const Style& target, float dt) {
         );
     }
 
-    const bool font_changed = previous_font != style.m_font || previous_font_size != style.m_font_size ||
-                              previous_font_weight != style.m_font_weight || previous_font_slant != style.m_font_slant;
-    if (font_changed || previous_box_sizing != style.m_box_sizing || measure_changed) {
+    if (font_changed || measure_changed) {
         style.notify_change(font_changed);
     }
 

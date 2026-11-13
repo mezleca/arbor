@@ -1,27 +1,27 @@
 #include "demo.hpp"
 
-#include <imgui-ui/backends/opengl/texture-loader.hpp>
-#include <imgui-ui/imgui/effects/effects.hpp>
-#include <imgui-ui/imgui/effects/opengl.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/layout/resizable-container.hpp>
-#include <imgui-ui/layout/tree-container.hpp>
-#include <imgui-ui/layout/virtual-layout.hpp>
-#include <imgui-ui/resources/texture-registry.hpp>
-#include <imgui-ui/style/style.hpp>
-#include <imgui-ui/style/styled-node.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/button.hpp>
-#include <imgui-ui/widgets/box.hpp>
-#include <imgui-ui/widgets/checkbox.hpp>
-#include <imgui-ui/widgets/color-picker.hpp>
-#include <imgui-ui/widgets/context-menu.hpp>
-#include <imgui-ui/widgets/dropdown.hpp>
-#include <imgui-ui/widgets/file-dialog.hpp>
-#include <imgui-ui/widgets/image.hpp>
-#include <imgui-ui/widgets/number-input.hpp>
-#include <imgui-ui/widgets/text-input.hpp>
-#include <imgui-ui/widgets/text.hpp>
+#include <arbor/backends/opengl/texture-loader.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/layout/resizable-container.hpp>
+#include <arbor/layout/tree-container.hpp>
+#include <arbor/layout/virtual-layout.hpp>
+#include <arbor/resources/texture-registry.hpp>
+#include <arbor/style/style.hpp>
+#include <arbor/style/styled-node.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/button.hpp>
+#include <arbor/widgets/box.hpp>
+#include <arbor/widgets/checkbox.hpp>
+#include <arbor/widgets/color-picker.hpp>
+#include <arbor/widgets/context-menu.hpp>
+#include <arbor/widgets/dropdown.hpp>
+#include <arbor/widgets/file-dialog.hpp>
+#include <arbor/widgets/image.hpp>
+#include <arbor/widgets/number-input.hpp>
+#include <arbor/widgets/text-input.hpp>
+#include <arbor/widgets/text.hpp>
 
 #include <algorithm>
 #include <array>
@@ -167,7 +167,7 @@ static Theme make_demo_theme(std::string_view variant) {
 void configure_demo_runtime(RuntimeConfig& config) {
     config.theme = make_demo_theme("default");
 
-#ifdef IMGUI_UI_ASSETS_DIR
+#ifdef ARBOR_ASSETS_DIR
     config.texture_loader = std::make_unique<OpenGLTextureLoader>();
 
     // use a global 64 mib cpu budget
@@ -315,7 +315,7 @@ private:
                                      event.button == PointerButton::Left &&
                                      !panel.layout().visual_rect().contains(event.position);
         const bool pressed_escape =
-            event.type == EventType::Cancel || (event.type == EventType::KeyDown && event.key == Key::Escape);
+            event.type == EventType::Cancel || (event.type == EventType::KeyDown && event.key == ImGuiKey_Escape);
         if (!clicked_outside && !pressed_escape) {
             return;
         }
@@ -468,8 +468,7 @@ protected:
 
         if (m_progress < 1.0F) {
             m_progress = std::min(1.0F, m_progress + 0.1F);
-            const float fill_width = std::max(0.0F, layout().size().x - 12.0F) * m_progress;
-            animator().animate().to(m_fill_width, fill_width, {m_duration_distribution(m_random), easing::out_cubic});
+            animator().animate().to(m_fill_progress, m_progress, {m_duration_distribution(m_random), easing::out_cubic});
             return;
         }
 
@@ -485,8 +484,8 @@ private:
         const Rect rect = context.rect;
         const ComputedStyle& style = context.style;
         const Rect box =
-            Rect::from_position_size({rect.min.x + 6.0F, rect.min.y + 6.0F}, {std::max(0.0F, rect.size().x - 12.0F), 32.0F});
-        const float fill_right = std::min(box.max.x, box.min.x + m_fill_width);
+            Rect::from_position_size({rect.min.x + 6.0f, rect.min.y + 6.0f}, {std::max(0.0f, rect.size().x - 12.0f), 32.0f});
+        const float fill_right = box.min.x + (box.size().x * m_fill_progress);
 
         context.painter.rect_filled(box, style.background_color().value, style.border_radius());
         if (fill_right > box.min.x) {
@@ -500,15 +499,15 @@ private:
 
         ImColor message_color = style.color().value.rgba();
         message_color.Value.w *= m_message_opacity;
-        const ImVec2 message_size = ImGui::CalcTextSize("finished");
+        const ImVec2 message_size = context.painter.text_size("finished");
         context.painter.text(
-            {box.min.x + ((box.size().x - message_size.x) * 0.5F), box.min.y + 8.0F + m_message_offset}, message_color, "finished"
+            {box.min.x + ((box.size().x - message_size.x) * 0.5f), box.min.y + 8.0f + m_message_offset}, message_color, "finished"
         );
     }
 
     Color m_fill_color;
     float m_progress = 0.0F;
-    float m_fill_width = 0.0F;
+    float m_fill_progress = 0.0f;
     float m_message_offset = 0.0F;
     float m_message_opacity = 0.0F;
     bool m_completed = false;
@@ -643,6 +642,7 @@ private:
     Container* m_texture_list = nullptr;
     std::vector<TextWidget*> m_texture_cards;
     float m_status_update_elapsed = 0.0F;
+    float m_scale_percent = 100.0f;
     Container* m_test_images = nullptr;
     bool m_enabled = true;
     bool m_radio_selected = true;
@@ -654,7 +654,7 @@ private:
     int m_next_dynamic_id = 0;
     int m_integer_value = 25;
     double m_unbounded_value = 1.0;
-    std::string m_name = "imgui-ui";
+    std::string m_name = "arbor";
     std::string m_password = "demo-password";
     std::string m_image_fit = "cover";
     std::string m_theme = "default";
@@ -715,7 +715,7 @@ void DemoScreen::setup_overview(Container& page, std::string_view backend) {
     auto& summary = overview.add<Container>("summary", StackDirection::Horizontal);
     summary.set_size({grow(), fit()});
     summary.set_spacing(16.0F);
-    summary.add<TextWidget>(std::format("imgui-ui / {}", backend));
+    summary.add<TextWidget>(std::format("arbor / {}", backend));
     m_fps = &summary.add<TextWidget>("fps: 0.0");
     summary.add<TextWidget>("debugger: shift + d");
 }
@@ -804,9 +804,9 @@ void DemoScreen::setup_numbers(Container& widgets) {
     bounded.set_range(0, 100);
     bounded.set_tooltip("drag the thumb or click a value between 0 and 100");
 
-    // clearing the range switches to unbounded dragging. hide the thumb and choose the drag speed and display precision.
+    // without a range, dragging has no upper or lower limit. the format keeps two decimal places.
     auto& unbounded = numbers.add<NumberInputWidget<double>>(m_unbounded_value, "unbounded double");
-    unbounded.clear_range().set_speed(0.01F).set_format("%.2f").set_thumb_visible(false);
+    unbounded.clear_range().set_speed(0.01f).set_format("%.2f");
     unbounded.set_tooltip("drag horizontally to change the value at 0.01 steps");
 }
 
@@ -1082,10 +1082,17 @@ void setup_grow_weights(Surface& ui, Container& layouts) {
 }
 
 void DemoScreen::setup_appearance(Container& styles) {
-    auto& appearance = styles.add<TreeContainer>("Themes & borders");
+    auto& appearance = styles.add<TreeContainer>("Appearance");
     appearance.set_size({grow(), fit()});
     appearance.set_spacing(8.0F);
     appearance.add<TextWidget>("appearance");
+
+    // 100% keeps the backend's dpi scale. changes apply next frame without replacing widget styles.
+    m_scale_percent = surface().scale() * 100.0f;
+    auto& scale = appearance.add<NumberInputWidget<float>>(m_scale_percent, "interface scale", LabelPlacement::Above);
+    scale.set_range(50.0f, 200.0f).set_format("%.0f%%").set_flags(ImGuiSliderFlags_AlwaysClamp);
+    scale.set_size({px(360.0f), fit()});
+    scale.on_change([this] { surface().set_scale(m_scale_percent / 100.0f); });
 
     auto& theme = appearance.add<DropdownWidget>(
         m_theme, std::vector<DropdownOption>{{"default", "default"}, {"pastel", "pastel"}, {"material 3", "material"}}, "theme"
@@ -1260,7 +1267,8 @@ void DemoScreen::setup_dynamic_nodes(Node& parent) {
 
 ImageWidget& DemoScreen::add_test_image(Texture* texture) {
     auto& image = m_test_images->add<ImageWidget>(texture);
-    image.set_size({grow(), grow()});
+    // a fixed logical width shows dpi zoom instead of letting cover keep fitting the same share of the window.
+    image.set_size({px(160.0f), grow()});
     image.set_fit(image_fit());
 
     // InputMode::None leaves an image out of pointer hit testing by default. Target lets it receive hover and click events.
@@ -1510,10 +1518,10 @@ void setup_modal(DemoScreen& demo, Surface& surface, Container& windows) {
 }
 
 void setup_demo(Surface& surface, std::string_view backend) {
-#ifdef IMGUI_UI_ASSETS_DIR
+#ifdef ARBOR_ASSETS_DIR
     Runtime& runtime = surface.runtime();
     // register resources before building controls. both backends use the same fonts, textures and example tree.
-    const std::filesystem::path assets = std::filesystem::path{IMGUI_UI_ASSETS_DIR};
+    const std::filesystem::path assets = std::filesystem::path{ARBOR_ASSETS_DIR};
     runtime.fonts().add("Inter Regular", assets / "fonts/Inter.ttf");
     surface.set_primary_font(runtime.fonts().find("Inter Regular"));
     runtime.textures().add("demo-file-icon", assets / "icons/demo.svg");

@@ -1,5 +1,5 @@
-#include <imgui-ui/style/color.hpp>
-#include <imgui-ui/style/gradient-data.hpp>
+#include <arbor/style/color.hpp>
+#include <arbor/style/gradient-data.hpp>
 
 #include <algorithm>
 #include <cmath>

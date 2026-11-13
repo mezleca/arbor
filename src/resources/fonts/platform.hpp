@@ -1,6 +1,6 @@
 #pragma once
 
-#include <imgui-ui/resources/font-registry.hpp>
+#include <arbor/resources/font-registry.hpp>
 
 namespace ui {
     std::vector<FontFace> enumerate_system_fonts();

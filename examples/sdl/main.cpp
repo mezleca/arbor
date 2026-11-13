@@ -1,8 +1,8 @@
 #include "../demo.hpp"
 
-#include <imgui-ui/backends/sdl/backend.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/runtime.hpp>
+#include <arbor/backends/sdl/backend.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/runtime.hpp>
 #include <SDL3/SDL.h>
 #include <memory>
 #include <utility>
@@ -22,7 +22,7 @@ int main() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    SDL_Window* window = SDL_CreateWindow("imgui-ui sdl", 1120, 920, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    SDL_Window* window = SDL_CreateWindow("arbor sdl", 1120, 920, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (window == nullptr) {
         SDL_Quit();
         return 1;

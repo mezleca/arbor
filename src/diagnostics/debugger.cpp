@@ -1,15 +1,15 @@
-#include <imgui-ui/diagnostics/debugger.hpp>
-#include <imgui-ui/diagnostics/profiler.hpp>
-#include <imgui-ui/imgui/context-scope.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/layout/resizable-container.hpp>
-#include <imgui-ui/resources/svg.hpp>
-#include <imgui-ui/resources/texture-registry.hpp>
-#include <imgui-ui/style/styled-node.hpp>
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/tree/node.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/runtime.hpp>
+#include <arbor/diagnostics/debugger.hpp>
+#include <arbor/diagnostics/profiler.hpp>
+#include <arbor/imgui/context-scope.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/layout/resizable-container.hpp>
+#include <arbor/resources/svg.hpp>
+#include <arbor/resources/texture-registry.hpp>
+#include <arbor/style/styled-node.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/tree/node.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/runtime.hpp>
 
 #include <imgui.h>
 #include <imgui_internal.h>

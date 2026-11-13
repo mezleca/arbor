@@ -1,11 +1,11 @@
-#include <imgui-ui/widgets/color-picker.hpp>
+#include <arbor/widgets/color-picker.hpp>
 
-#include <imgui-ui/imgui/painter.hpp>
-#include <imgui-ui/layout/layer-container.hpp>
-#include <imgui-ui/style/theme.hpp>
-#include <imgui-ui/surface.hpp>
-#include <imgui-ui/widgets/text-input.hpp>
-#include <imgui-ui/widgets/text.hpp>
+#include <arbor/imgui/painter.hpp>
+#include <arbor/layout/layer-container.hpp>
+#include <arbor/style/theme.hpp>
+#include <arbor/surface.hpp>
+#include <arbor/widgets/text-input.hpp>
+#include <arbor/widgets/text.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,16 +21,18 @@ static float saturate(float value) {
     return std::clamp(value, 0.0F, 1.0F);
 }
 
-static bool active_area(const char* id, Rect rect) {
+static bool active_area(const Painter& paint, const char* id, Rect rect) {
+    rect = paint.to_screen(rect);
     ImGui::SetCursorScreenPos(rect.min);
     ImGui::InvisibleButton(id, rect.size());
     return ImGui::IsItemActive();
 }
 
 static void draw_picker_gradient(
-    ImDrawList& draw_list, Rect rect, ImVec4 top_left, ImVec4 top_right, ImVec4 bottom_right, ImVec4 bottom_left
+    const Painter& paint, Rect rect, ImVec4 top_left, ImVec4 top_right, ImVec4 bottom_right, ImVec4 bottom_left
 ) {
-    draw_list.AddRectFilledMultiColor(
+    rect = paint.to_screen(rect);
+    paint.draw_list().AddRectFilledMultiColor(
         rect.min, rect.max, ImGui::GetColorU32(top_left), ImGui::GetColorU32(top_right), ImGui::GetColorU32(bottom_right),
         ImGui::GetColorU32(bottom_left)
     );
@@ -137,7 +139,7 @@ private:
     void on_measure() override {
         const Theme& theme = surface().theme();
         const float bar_size = std::max(1.0F, theme.controls.thumb_size);
-        const float size = 196.0F + theme.metrics.item_spacing.x + bar_size;
+        const float size = (196.0f + theme.metrics.item_spacing.x + bar_size) * dpi_scale();
         set_measured_content_size({size, size});
     }
 
@@ -208,7 +210,7 @@ private:
         if (!m_owner.is_open()) return LayerContainer::paint();
 
         const Rect preview_rect = m_owner.preview().layout().visual_rect();
-        set_popup_position({preview_rect.min.x, preview_rect.max.y + surface().theme().metrics.item_spacing.y});
+        set_popup_position({preview_rect.min.x, preview_rect.max.y + (surface().theme().metrics.item_spacing.y * dpi_scale())});
         if (!LayerContainer::paint()) {
             m_owner.close();
             return false;
@@ -229,10 +231,11 @@ private:
 };
 
 void ColorPickerControlsNode::paint_content(const PaintContext& context) {
+    const Painter& paint = context.painter;
     const Rect content = context.content_rect;
     const Theme& theme = surface().theme();
     const ImVec2 spacing = theme.metrics.item_spacing;
-    const float bar_size = std::max(1.0F, theme.controls.thumb_size);
+    const float bar_size = std::max(1.0f, theme.controls.thumb_size);
 
     ImColor color = m_owner.m_value.value().rgba();
     float hue = 0.0F;
@@ -254,30 +257,28 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
         Rect::from_position_size({selector.min.x, selector.max.y + spacing.y}, {hue_bar.max.x - selector.min.x, bar_size});
 
     // invisible controls update hsv before the surfaces below read the new color for this frame.
-    if (active_area("selector", selector)) {
-        const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const ImVec2 mouse = paint.to_logical(ImGui::GetIO().MousePos);
+    if (active_area(paint, "selector", selector)) {
         saturation = saturate((mouse.x - selector.min.x) / selector.size().x);
         value = 1.0F - saturate((mouse.y - selector.min.y) / selector.size().y);
         set_hsv(hue, saturation, value, color.Value.w);
         color = m_owner.m_value.value().rgba();
     }
 
-    if (active_area("hue", hue_bar)) {
-        hue = saturate((ImGui::GetIO().MousePos.y - hue_bar.min.y) / hue_bar.size().y);
+    if (active_area(paint, "hue", hue_bar)) {
+        hue = saturate((mouse.y - hue_bar.min.y) / hue_bar.size().y);
         set_hsv(hue, saturation, value, color.Value.w);
         color = m_owner.m_value.value().rgba();
     }
 
-    if (m_owner.m_alpha_visible && active_area("alpha", alpha_bar)) {
-        color.Value.w = saturate((ImGui::GetIO().MousePos.x - alpha_bar.min.x) / alpha_bar.size().x);
+    if (m_owner.m_alpha_visible && active_area(paint, "alpha", alpha_bar)) {
+        color.Value.w = saturate((mouse.x - alpha_bar.min.x) / alpha_bar.size().x);
         m_owner.set_color(color);
     }
 
-    const Painter paint = painter();
-    ImDrawList& draw_list = paint.draw_list();
     const ImColor hue_color = hsv_color(hue, 1.0F, 1.0F);
-    draw_picker_gradient(draw_list, selector, rgb(255, 255, 255), hue_color, hue_color, rgb(255, 255, 255));
-    draw_picker_gradient(draw_list, selector, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0), rgb(0, 0, 0), rgb(0, 0, 0));
+    draw_picker_gradient(paint, selector, rgb(255, 255, 255), hue_color, hue_color, rgb(255, 255, 255));
+    draw_picker_gradient(paint, selector, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0), rgb(0, 0, 0), rgb(0, 0, 0));
     paint.rect_outline(selector, theme.controls.border_color);
 
     for (int index = 0; index < 6; ++index) {
@@ -285,7 +286,7 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
         const float bottom = hue_bar.min.y + (hue_bar.size().y * static_cast<float>(index + 1) / 6.0F);
         const ImColor first = hsv_color(static_cast<float>(index) / 6.0F, 1.0F, 1.0F);
         const ImColor second = hsv_color(static_cast<float>(index + 1) / 6.0F, 1.0F, 1.0F);
-        draw_picker_gradient(draw_list, {{hue_bar.min.x, top}, {hue_bar.max.x, bottom}}, first, first, second, second);
+        draw_picker_gradient(paint, {{hue_bar.min.x, top}, {hue_bar.max.x, bottom}}, first, first, second, second);
     }
     paint.rect_outline(hue_bar, theme.controls.border_color);
 
@@ -295,7 +296,7 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
         const ImColor opaque = ImColor(color.Value.x, color.Value.y, color.Value.z, 1.0f);
         const ImColor transparent = ImColor(color.Value.x, color.Value.y, color.Value.z, 0.0f);
 
-        draw_picker_gradient(draw_list, alpha_bar, transparent, opaque, opaque, transparent);
+        draw_picker_gradient(paint, alpha_bar, transparent, opaque, opaque, transparent);
         paint.rect_outline(alpha_bar, theme.controls.border_color);
     }
 
@@ -304,14 +305,14 @@ void ColorPickerControlsNode::paint_content(const PaintContext& context) {
         selector.min.y + ((1.0F - value) * selector.size().y),
     };
 
-    paint.circle(selector_cursor, 5.0F, theme.background_color);
-    paint.circle_outline(selector_cursor, 5.0F, theme.text_color, 1.5F);
+    paint.circle(selector_cursor, 5.0f, theme.background_color);
+    paint.circle_outline(selector_cursor, 5.0f, theme.text_color, 1.5f);
 
     const float hue_cursor_y = hue_bar.min.y + (hue * hue_bar.size().y);
 
-    paint.line({hue_bar.min.x - 2.0F, hue_cursor_y}, {hue_bar.max.x + 2.0F, hue_cursor_y}, theme.text_color, 2.0F);
+    paint.line({hue_bar.min.x - 2.0f, hue_cursor_y}, {hue_bar.max.x + 2.0f, hue_cursor_y}, theme.text_color, 2.0f);
     paint.line(
-        {hue_bar.min.x - 2.0F, hue_cursor_y + 1.0F}, {hue_bar.max.x + 2.0F, hue_cursor_y + 1.0F}, theme.background_color, 1.0F
+        {hue_bar.min.x - 2.0f, hue_cursor_y + 1.0f}, {hue_bar.max.x + 2.0f, hue_cursor_y + 1.0f}, theme.background_color, 1.0f
     );
 
     if (m_owner.m_alpha_visible) {

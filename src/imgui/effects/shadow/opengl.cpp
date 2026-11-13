@@ -1,9 +1,10 @@
-#include <imgui-ui/imgui/effects/shadow/opengl.hpp>
+#include <arbor/imgui/effects/shadow/opengl.hpp>
+#include <arbor/imgui/effects/clip/opengl.hpp>
 
-#include <imgui-ui/imgui/effects/shadow/shadow.hpp>
-#include <imgui-ui/imgui/effects/effects.hpp>
-#include <imgui-ui/imgui/effects/opengl.hpp>
-#include <imgui-ui/imgui/effects/gradient/opengl-shared.hpp>
+#include <arbor/imgui/effects/shadow/shadow.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
+#include <arbor/imgui/effects/gradient/opengl-shared.hpp>
 
 #include <algorithm>
 #include <string>
@@ -114,11 +115,11 @@ coverage *= smoothstep(-cutout_antialias, cutout_antialias, cutout_distance);
 
 // shadow colors span the blurred bounds, including pixels outside the owner shape.
 vec4 sampled = sample_color(point, gradient_bounds);
-color = vec4(sampled.rgb, sampled.a * coverage * opacity);
+color = vec4(sampled.rgb, sampled.a * coverage * opacity * clip_coverage());
 })";
 
 static bool create_program() {
-    const std::string fragment_source = std::string{"#version 330 core\n"} + GRADIENT_SAMPLER_GLSL + FRAGMENT_BODY;
+    const std::string fragment_source = std::string{"#version 330 core\n"} + CLIP_GLSL + GRADIENT_SAMPLER_GLSL + FRAGMENT_BODY;
     if (!gl_state->effect.initialize(fragment_source.c_str())) {
         return false;
     }
@@ -185,6 +186,7 @@ static void render_box_shadow(void*, const ImDrawList*, const ImDrawCmd* command
     );
     glUniform1f(gl_state->opacity, region->opacity);
     upload_gradient(gl_state->sampler, region->color, region->gradient);
+    apply_opengl_clip(gl_state->effect.program());
     OpenGlFullscreenEffect::draw();
 }
 

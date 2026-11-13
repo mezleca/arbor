@@ -1,4 +1,4 @@
-#include <imgui-ui/layout/virtual-layout.hpp>
+#include <arbor/layout/virtual-layout.hpp>
 
 #include <algorithm>
 #include <climits>
@@ -115,7 +115,7 @@ float VirtualLayout::content_height() const {
 
     if (count > 1) height += static_cast<float>(count - 1) * m_spacing;
 
-    return height + m_extra_height;
+    return (height + m_extra_height) * dpi_scale();
 }
 
 void VirtualLayout::on_measure() {
@@ -166,16 +166,19 @@ void VirtualLayout::draw_children() {
     size_t first = 0;
 
     // each expanded row becomes its own run while rows between offsets share one height for imgui's clipper.
+    const float scale = dpi_scale();
+    const float height = m_item_height * scale;
     for (const auto& [index, extra] : m_extra_offsets) {
-        draw_range(first, index - first, m_item_height, width, buffer);
-        draw_range(index, 1, m_item_height + extra, width, buffer);
+        draw_range(first, index - first, height, width, buffer);
+        draw_range(index, 1, height + (extra * scale), width, buffer);
         first = index + 1;
     }
 
-    draw_range(first, m_item_count - first, m_item_height, width, buffer);
+    draw_range(first, m_item_count - first, height, width, buffer);
 }
 
 size_t VirtualLayout::item_boundary(float position, bool end) const {
+    position /= dpi_scale();
     // convert a content-space y position to a source index while removing expansion pixels already crossed.
     const float stride = m_item_height + m_spacing;
     for (const auto& [index, extra] : m_extra_offsets) {
@@ -199,7 +202,7 @@ void VirtualLayout::draw_range(size_t first, size_t count, float height, float w
 
     ImGuiListClipper clipper;
 
-    const float stride = height + m_spacing;
+    const float stride = height + (m_spacing * dpi_scale());
     const float offset = ImGui::GetCursorPosY() - ImGui::GetCursorStartPos().y - ImGui::GetScrollY();
     const ImVec2 start = ImGui::GetCursorScreenPos();
 

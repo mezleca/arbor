@@ -1,6 +1,6 @@
-#include <imgui-ui/layout/resizable-container.hpp>
+#include <arbor/layout/resizable-container.hpp>
 
-#include <imgui-ui/imgui/painter.hpp>
+#include <arbor/imgui/painter.hpp>
 
 #include <algorithm>
 
@@ -52,10 +52,11 @@ Rect ResizableContainer::hit_rect(Rect visual_rect) const {
 
 Rect ResizableContainer::resize_handle() const {
     const ImVec2 max = layout().visual_rect().max;
+    const float scale = dpi_scale();
     return Rect::from_position_size(
-        {max.x - CHILD_RESIZE_HANDLE_SIZE - CHILD_RESIZE_HANDLE_INSET,
-         max.y - CHILD_RESIZE_HANDLE_SIZE - CHILD_RESIZE_HANDLE_INSET},
-        {CHILD_RESIZE_HANDLE_SIZE, CHILD_RESIZE_HANDLE_SIZE}
+        {max.x - ((CHILD_RESIZE_HANDLE_SIZE + CHILD_RESIZE_HANDLE_INSET) * scale),
+         max.y - ((CHILD_RESIZE_HANDLE_SIZE + CHILD_RESIZE_HANDLE_INSET) * scale)},
+        {CHILD_RESIZE_HANDLE_SIZE * scale, CHILD_RESIZE_HANDLE_SIZE * scale}
     );
 }
 
@@ -90,9 +91,10 @@ void ResizableContainer::mouse_move_event(UiEvent& event) {
     if (!resizing()) return;
 
     const ImVec2 child_min = layout().visual_rect().min;
+    const float minimum = MIN_CHILD_SIZE * dpi_scale();
     const ImVec2 max_size = {
-        std::max(MIN_CHILD_SIZE, m_parent_content_max.x - child_min.x),
-        std::max(MIN_CHILD_SIZE, m_parent_content_max.y - child_min.y),
+        std::max(minimum, m_parent_content_max.x - child_min.x),
+        std::max(minimum, m_parent_content_max.y - child_min.y),
     };
 
     LayoutSize updated = layout().size_spec();
@@ -103,9 +105,9 @@ void ResizableContainer::mouse_move_event(UiEvent& event) {
         const float position = horizontal ? event.position.x : event.position.y;
         const float start = horizontal ? m_drag_start.x : m_drag_start.y;
         const float maximum = horizontal ? max_size.x : max_size.y;
-        const float size = std::clamp(previous + position - start, MIN_CHILD_SIZE, maximum);
+        const float size = std::clamp(previous + position - start, minimum, maximum);
         axis.mode = LayoutSizeMode::Fixed;
-        axis.value = std::max(0.0F, size - (horizontal ? insets.x : insets.y));
+        axis.value = std::max(0.0f, size - (horizontal ? insets.x : insets.y)) / dpi_scale();
     };
 
     if ((m_resizing & ResizeAxes::X) != ResizeAxes::None) resize_axis(true, updated.width, m_previous_size.x);
@@ -124,10 +126,10 @@ void ResizableContainer::draw_resize_indicator() {
     const ComputedStyle& current_style = computed_style();
     const float border_thickness = current_style.border_thickness();
     const Painter paint = painter();
-    const ImVec2 max = resize_handle().max;
+    const ImVec2 max = paint.to_logical(resize_handle().max);
 
     for (int i = 0; i < 3; ++i) {
-        const float distance = 3.0F + (static_cast<float>(i) * 4.0F);
+        const float distance = 3.0f + (static_cast<float>(i) * 4.0f);
         paint.line(
             {max.x - distance - 1.0f, max.y}, {max.x, max.y - distance}, current_style.border_color().value, border_thickness
         );

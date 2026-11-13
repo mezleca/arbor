@@ -1,14 +1,16 @@
-#include <imgui-ui/imgui/effects/blur/opengl.hpp>
+#include <arbor/imgui/effects/blur/opengl.hpp>
+#include <arbor/imgui/effects/clip/opengl.hpp>
 
-#include <imgui-ui/imgui/effects/blur/blur.hpp>
-#include <imgui-ui/imgui/effects/effects.hpp>
-#include <imgui-ui/imgui/effects/opengl.hpp>
+#include <arbor/imgui/effects/blur/blur.hpp>
+#include <arbor/imgui/effects/effects.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
 
 #include <glad/gl.h>
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <string>
 #include <unordered_map>
 
 using namespace ui;
@@ -56,7 +58,7 @@ const vec2 positions[3] = vec2[](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3
 gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
 })";
 
-static constexpr const char* FRAGMENT_SHADER = R"(#version 330 core
+static constexpr const char* FRAGMENT_SHADER = R"(
 uniform sampler2D image;
 uniform sampler2D original;
 uniform vec2 texel;
@@ -105,11 +107,12 @@ blurred = mix(texture(original, uv), blurred, amount);
 
 vec2 point = gl_FragCoord.xy - region.xy;
 if (rounded_box(point, region.zw, rounding) > 0.0) discard;
-color = vec4(blurred.rgb, blurred.a * opacity);
+color = vec4(blurred.rgb, blurred.a * opacity * clip_coverage());
 })";
 
 static bool create_program() {
-    textures->program = create_opengl_effect_program(VERTEX_SHADER, FRAGMENT_SHADER);
+    const std::string fragment = std::string{"#version 330 core\n"} + CLIP_GLSL + FRAGMENT_SHADER;
+    textures->program = create_opengl_effect_program(VERTEX_SHADER, fragment.c_str());
     if (textures->program == 0) {
         return false;
     }
@@ -246,12 +249,10 @@ static void render_blur(void*, const ImDrawList*, const ImDrawCmd* command, cons
     const ImVec2 minimum = transform.apply(region->output.min);
     const ImVec2 maximum = transform.apply(region->output.max);
 
-    const ImVec2 output_minimum = transform.apply(region->output.min);
-    const ImVec2 output_maximum = transform.apply(region->output.max);
-    const float region_left = output_minimum.x;
-    const float region_bottom = static_cast<float>(height) - output_maximum.y;
-    const float region_width = output_maximum.x - output_minimum.x;
-    const float region_height = output_maximum.y - output_minimum.y;
+    const float region_left = minimum.x;
+    const float region_bottom = static_cast<float>(height) - maximum.y;
+    const float region_width = maximum.x - minimum.x;
+    const float region_height = maximum.y - minimum.y;
     const int left = std::clamp(static_cast<int>(std::floor(region_left)), 0, width);
     const int right = std::clamp(static_cast<int>(std::ceil(region_left + region_width)), 0, width);
     const int bottom = std::clamp(static_cast<int>(std::floor(region_bottom)), 0, height);
@@ -298,7 +299,6 @@ static void render_blur(void*, const ImDrawList*, const ImDrawCmd* command, cons
     glViewport(0, 0, width, height);
     glEnable(GL_SCISSOR_TEST);
     glScissor(clipped_left, clipped_bottom, clipped_right - clipped_left, clipped_top - clipped_bottom);
-    glDisable(GL_BLEND);
     glUseProgram(textures->program);
     glUniform1i(textures->image, 0);
     glUniform1i(textures->original, 1);
@@ -318,7 +318,8 @@ static void render_blur(void*, const ImDrawList*, const ImDrawCmd* command, cons
     glBindTexture(GL_TEXTURE_2D, textures->source);
     glBindVertexArray(textures->vertex_array);
 
-    if (region->opacity < 1.0F) {
+    const bool rounded_clip = apply_opengl_clip(textures->program);
+    if (region->opacity < 1.0f || rounded_clip) {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     } else {
