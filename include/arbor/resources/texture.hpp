@@ -21,6 +21,9 @@ namespace ui {
         // release context-local data while retaining the source for later contexts.
         virtual void release_context(ImGuiContext* context) = 0;
 
+        // trims unused context data after rendering, when no queued draw commands still need it
+        virtual void collect_context(ImGuiContext*) {}
+
         // estimated payload bytes, excluding allocator/driver overhead. nullptr sums all gpu contexts.
         // custom loaders should override this to participate in byte budgets.
         virtual TextureMemoryUsage memory_usage(ImGuiContext* = nullptr) const {

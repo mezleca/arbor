@@ -6,12 +6,14 @@
 #include <arbor/backends/sdl/backend.hpp>
 #include <arbor/diagnostics/debugger.hpp>
 #include <arbor/imgui/context-scope.hpp>
+#include <arbor/imgui/effects/opengl.hpp>
 #include <arbor/layout/container.hpp>
 #include <arbor/layout/layer-container.hpp>
 #include <arbor/layout/resizable-container.hpp>
 #include <arbor/layout/tree-container.hpp>
 #include <arbor/layout/virtual-layout.hpp>
 #include <arbor/surface.hpp>
+#include <arbor/style/paint-slot.hpp>
 #include <arbor/widgets/button.hpp>
 #include <arbor/widgets/checkbox.hpp>
 #include <arbor/widgets/dropdown.hpp>

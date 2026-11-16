@@ -11,6 +11,9 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
+
+struct ImGuiWindow;
 
 namespace ui {
     class StyledNode : public Node {
@@ -179,6 +182,7 @@ namespace ui {
         void advance_size_transition(float dt);
 
         VisualState m_state;
+        std::vector<std::pair<ImGuiWindow*, int>> m_transform_windows;
         std::string_view m_type_name;
         std::unique_ptr<PaintSlot> m_before;
         std::unique_ptr<PaintSlot> m_after;

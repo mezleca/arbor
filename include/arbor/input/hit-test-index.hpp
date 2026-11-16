@@ -39,7 +39,7 @@ namespace ui {
         };
 
         /// snapshots the deepest hit nodes of each branch front to back, restricted to the active blocker's subtree.
-        Route route_at(ImVec2 position, EventType type) const;
+        Route route_at(ImVec2 position, EventType type, Route route = {}) const;
 
         std::size_t size() const;
         std::size_t checks() const;

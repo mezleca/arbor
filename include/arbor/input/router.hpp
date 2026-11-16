@@ -69,6 +69,10 @@ namespace ui {
             return m_focused_node;
         }
 
+        const Node* captured_node() const {
+            return m_pointer_capture;
+        }
+
         /// invokes the router callback before node routing. stop_propagation skips node delivery.
         bool dispatch(UiEvent& event);
 
@@ -142,6 +146,7 @@ namespace ui {
         static void dispatch_branch(Node& target, UiEvent& event, std::vector<Node*>& visited, Node* scope = nullptr);
 
         HitTestIndex m_hit_test;
+        HitTestIndex::Route m_hover_route;
         InputCallback m_on_event;
         Node* m_focused_node = nullptr;
         bool m_debug_inspect_mode = false;

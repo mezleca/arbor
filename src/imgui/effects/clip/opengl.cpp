@@ -5,6 +5,7 @@
 #include <arbor/imgui/paint-state.hpp>
 
 #include <limits>
+#include <array>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -17,12 +18,17 @@ struct ClipUniforms {
     GLint radii = -1;
     GLint transform = -1;
     GLint height = -1;
+    int depth = -1;
     uint64_t clip_id = std::numeric_limits<uint64_t>::max();
+    ImVec4 uploaded_transform;
+    int uploaded_height = -1;
 };
 
 struct ClipGlState {
     GLuint program = 0;
     GLuint native_program = 0;
+    GLint native_projection = -1;
+    GLint projection = -1;
     const RoundedClip* clip = nullptr;
     std::unordered_map<GLuint, ClipUniforms> uniforms;
     bool projection_ready = false;
@@ -70,22 +76,43 @@ bool ui::apply_opengl_clip(GLuint program) {
     const uint64_t id = state.clip != nullptr ? state.clip->id : 0;
     if (uniforms.clip_id == id) return state.clip != nullptr;
     uniforms.clip_id = id;
-    glUniform1i(uniforms.count, state.clip != nullptr ? state.clip->depth : 0);
+    const int depth = state.clip != nullptr ? state.clip->depth : 0;
+    if (uniforms.depth != depth) {
+        glUniform1i(uniforms.count, depth);
+        uniforms.depth = depth;
+    }
     if (state.clip == nullptr) return false;
 
+    std::array<GLfloat, 64 * 4> rects;
+    std::array<GLfloat, 64> radii;
     int index = 0;
     for (const RoundedClip* clip = state.clip; clip != nullptr; clip = clip->parent, ++index) {
-        glUniform4f(uniforms.rects + index, clip->rect.min.x, clip->rect.min.y, clip->rect.max.x, clip->rect.max.y);
-        glUniform1f(uniforms.radii + index, clip->rounding);
+        rects[index * 4] = clip->rect.min.x;
+        rects[index * 4 + 1] = clip->rect.min.y;
+        rects[index * 4 + 2] = clip->rect.max.x;
+        rects[index * 4 + 3] = clip->rect.max.y;
+        radii[index] = clip->rounding;
     }
+    glUniform4fv(uniforms.rects, index, rects.data());
+    glUniform1fv(uniforms.radii, index, radii.data());
     const FramebufferTransform transform = framebuffer_transform();
     GLint viewport[4]{};
     glGetIntegerv(GL_VIEWPORT, viewport);
-    glUniform4f(
-        uniforms.transform, transform.display_position.x, transform.display_position.y, 1.0f / transform.scale.x,
-        1.0f / transform.scale.y
-    );
-    glUniform1f(uniforms.height, static_cast<float>(viewport[3]));
+    const ImVec4 coordinates{
+        transform.display_position.x, transform.display_position.y, 1.0f / transform.scale.x, 1.0f / transform.scale.y
+    };
+    // uniforms belong to the program and survive native renderer resets and shader switches
+    // keep querying the viewport so custom callbacks can still change it within a frame
+    if (uniforms.uploaded_height == -1 || uniforms.uploaded_transform.x != coordinates.x ||
+        uniforms.uploaded_transform.y != coordinates.y || uniforms.uploaded_transform.z != coordinates.z ||
+        uniforms.uploaded_transform.w != coordinates.w) {
+        glUniform4f(uniforms.transform, coordinates.x, coordinates.y, coordinates.z, coordinates.w);
+        uniforms.uploaded_transform = coordinates;
+    }
+    if (uniforms.uploaded_height != viewport[3]) {
+        glUniform1f(uniforms.height, static_cast<float>(viewport[3]));
+        uniforms.uploaded_height = viewport[3];
+    }
     return true;
 }
 
@@ -115,15 +142,18 @@ static void render(void*, const ImDrawList*, const ImDrawCmd*, const void* paylo
         GLint linked = GL_FALSE;
         glGetProgramiv(state.program, GL_LINK_STATUS, &linked);
         if (linked != GL_TRUE) throw std::runtime_error("failed to link rounded clip shader");
+        state.native_projection = glGetUniformLocation(state.native_program, "ProjMtx");
+        state.projection = glGetUniformLocation(state.program, "ProjMtx");
+        glUseProgram(state.program);
+        glUniform1i(glGetUniformLocation(state.program, "Texture"), 0);
     }
 
     glUseProgram(state.program);
     if (!state.projection_ready) {
         // native setup owns projection and clip origin. copy it once per frame instead of duplicating its coordinate rules.
         GLfloat projection[16]{};
-        glGetUniformfv(state.native_program, glGetUniformLocation(state.native_program, "ProjMtx"), projection);
-        glUniformMatrix4fv(glGetUniformLocation(state.program, "ProjMtx"), 1, GL_FALSE, projection);
-        glUniform1i(glGetUniformLocation(state.program, "Texture"), 0);
+        glGetUniformfv(state.native_program, state.native_projection, projection);
+        glUniformMatrix4fv(state.projection, 1, GL_FALSE, projection);
         state.projection_ready = true;
     }
     apply_opengl_clip(state.program);

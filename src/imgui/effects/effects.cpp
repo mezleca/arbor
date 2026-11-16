@@ -9,7 +9,7 @@
 using namespace ui;
 
 void EffectRegistry::render_command(const ImDrawList* draw_list, const ImDrawCmd* draw_command) {
-    // imgui copies callback bytes without alignment padding. read the header into an aligned local before dispatch.
+    // imgui's callback storage may not satisfy the command header's alignment
     QueuedCommand command;
     std::memcpy(&command, draw_command->UserCallbackData, sizeof(command));
     command.render(command.user_data, draw_list, draw_command, command.command);
@@ -85,10 +85,11 @@ void EffectRegistry::begin_frame() {
         return;
     }
 
+    // reuse command allocations across frames
     m_command_memory.release();
 
     for (Entry& entry : m_entries) {
-        if (entry.initialized && entry.definition.begin_frame != nullptr) {
+        if (entry.definition.begin_frame != nullptr) {
             entry.definition.begin_frame(entry.definition.user_data);
         }
     }
@@ -107,6 +108,8 @@ void EffectRegistry::shutdown() {
     }
 
     m_initialized = false;
+    m_command_memory.release();
+    m_command_pool.release();
 }
 
 bool EffectRegistry::submit(ImDrawList& draw_list, uint32_t id, const void* command, std::size_t size) const {
@@ -115,7 +118,7 @@ bool EffectRegistry::submit(ImDrawList& draw_list, uint32_t id, const void* comm
     }
 
     const Entry* entry = find(id);
-    if (entry == nullptr || !entry->initialized || entry->definition.render == nullptr || size != entry->command_size) {
+    if (entry == nullptr || size != entry->command_size) {
         return false;
     }
 

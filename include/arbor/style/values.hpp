@@ -63,7 +63,7 @@ namespace ui {
 
         void set(T new_value) {
             value = std::move(new_value);
-            m_has_target = false;
+            m_elapsed = -1.0f;
         }
 
         void set_transition(TransitionSpec transition) {
@@ -72,7 +72,7 @@ namespace ui {
         }
 
         bool is_transitioning() const {
-            return m_has_target && m_elapsed < m_duration;
+            return m_elapsed >= 0.0f && m_elapsed < m_duration;
         }
 
         bool tick(const Value& target, float dt) {
@@ -93,7 +93,7 @@ namespace ui {
             // interpolating so retargeting continues from that captured value.
             const float target_duration = std::max(0.0F, target.duration);
             const EasingFunction target_easing = target.easing != nullptr ? target.easing : easing::linear;
-            const bool target_changed = !m_has_target || !transition_values_equal(m_target, target.value) ||
+            const bool target_changed = m_elapsed < 0.0f || !transition_values_equal(m_target, target.value) ||
                                         m_duration != target_duration || m_easing != target_easing;
             const float previous_elapsed = m_elapsed;
             if (target_changed) {
@@ -102,7 +102,6 @@ namespace ui {
                 m_duration = target_duration;
                 m_easing = target_easing;
                 m_elapsed = 0.0F;
-                m_has_target = true;
             }
 
             if (m_duration == 0.0F) {
@@ -121,9 +120,8 @@ namespace ui {
         T m_start{};
         T m_target{};
         float m_duration = 0.0F;
+        float m_elapsed = -1.0f; // no target
         EasingFunction m_easing = easing::linear;
-        float m_elapsed = 0.0F;
-        bool m_has_target = false;
     };
 
     using FloatValue = Value<float>;

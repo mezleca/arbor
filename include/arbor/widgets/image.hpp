@@ -30,9 +30,11 @@ namespace ui {
             return *this;
         }
 
+    protected:
+        void paint_content(const PaintContext& context) override;
+
     private:
         ImVec2 measure_content(ImVec2 available) const override;
-        void paint_content(const PaintContext& context) override;
 
         Texture* m_texture = nullptr;
         TextureHandle m_texture_handle;

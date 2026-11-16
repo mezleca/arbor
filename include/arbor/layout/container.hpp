@@ -101,6 +101,16 @@ namespace ui {
         Scroll m_scroll;
         mutable std::vector<LayoutItem> m_layout_items;
         mutable std::vector<LayoutLine> m_layout_lines;
+
+        mutable ImVec2 m_measure_allocation;
+        mutable ImVec2 m_measure_result;
+        mutable uint64_t m_cached_measure_revision = 0;
+        mutable ImVec2 m_children_allocation;
+        mutable ImVec2 m_children_result;
+        mutable uint64_t m_children_revision = 0;
+        mutable bool m_measure_cache_valid = false;
+        mutable bool m_children_cache_valid = false;
+
         StackDirection m_direction = StackDirection::Vertical;
         StackWrap m_wrap = StackWrap::NoWrap;
         float m_spacing = 0.0F;

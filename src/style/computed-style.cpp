@@ -51,7 +51,10 @@ PushState ComputedStyle::push(float opacity, ImFont* effective_font, float effec
         ++state.variables;
     };
 
-    const auto push_color = [&state](ImGuiCol color, ImVec4 value) {
+    const auto push_color = [&state, &current](ImGuiCol color, ImVec4 value) {
+        const ImVec4& current_color = current.Colors[color];
+        if (current_color.x == value.x && current_color.y == value.y && current_color.z == value.z && current_color.w == value.w)
+            return;
         ImGui::PushStyleColor(color, value);
         ++state.colors;
     };

@@ -297,17 +297,25 @@ TEST_CASE("gpu profiling summarizes recent completed queries") {
     REQUIRE(profiler.gpu_render_summary().samples == 0);
 }
 
-TEST_CASE("ui closes render profiling before publishing the frame") {
+TEST_CASE("surface publishes completed render timing and drawn node counts") {
     ui::Runtime runtime;
     ui::Surface surface = ui_test::make_surface(runtime);
     const auto surface_context = ui_test::prepare_surface(surface, {320.0F, 240.0F});
     surface.profiler().set_enabled(true);
+    auto& node = surface.root().add<ui::StyledNode>("profiled");
 
     surface.begin_frame();
+    surface.update(0.01f);
     surface.draw();
     surface.end_frame();
 
     REQUIRE(surface.profiler().latest_metrics().render_ms > 0.0);
+    const auto visible_count = surface.profiler().latest_metrics().nodes_drawn;
+    REQUIRE(visible_count > 0);
+
+    node.set_visible(false);
+    ui_test::draw_surface(surface, 0.01f);
+    REQUIRE(surface.profiler().latest_metrics().nodes_drawn == visible_count - 1);
 }
 
 TEST_CASE("ui profiler separates root update and draw time") {
@@ -358,25 +366,4 @@ TEST_CASE("ui profiler reports event overflow without corrupting the frame") {
 
     REQUIRE(profiler.latest_events().size() == ui::Profiler::EVENT_CAPACITY);
     REQUIRE(profiler.dropped_events() == 1);
-}
-
-TEST_CASE("ui profiler counts drawn nodes") {
-    ui_test::ImGuiContext context({100.0F, 100.0F});
-    ImGui::NewFrame();
-
-    ui::Profiler profiler;
-    profiler.set_enabled(true);
-    ui::StyledNode node("styled");
-    node.set_profiler(&profiler);
-    node.fade_in();
-
-    profiler.begin_frame();
-    node.update(0.01F);
-    node.draw();
-    profiler.end_frame();
-
-    const ui::ProfileFrameMetrics& metrics = profiler.latest_metrics();
-    REQUIRE(metrics.nodes_drawn == 1);
-
-    ImGui::EndFrame();
 }

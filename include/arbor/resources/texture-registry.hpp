@@ -98,6 +98,7 @@ namespace ui {
 
         std::unique_ptr<TextureLoader> m_loader;
         std::unordered_map<std::string, std::shared_ptr<RegistryTexture>, StringHash, std::equal_to<>> m_assets;
+        std::vector<decltype(m_assets)::iterator> m_collection_candidates;
         TextureCacheConfig m_config;
         mutable std::uint64_t m_access_counter = 0;
     };

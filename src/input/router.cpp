@@ -72,7 +72,7 @@ void InputRouter::set_debug_pointer_blocked(bool blocked) {
 void InputRouter::clear_input_state(Node& subtree) {
     // remove hit regions and their hover flags before clearing focus, capture and stored presses.
     m_hit_test.erase_subtree(subtree);
-    std::erase_if(m_hovered_nodes, [this, &subtree](Node* node) {
+    std::erase_if(m_hovered_nodes, [&subtree](Node* node) {
         if (!subtree.contains(node)) return false;
 
         node->set_input_state(set_input_flag(node->input_state(), &InputState::hovered, false));
@@ -103,7 +103,11 @@ void InputRouter::refresh_pointer_state(ImVec2 position) {
         return;
     }
 
-    set_hovered(m_hit_test.route_at(position, EventType::PointerMove));
+    auto route = m_hit_test.route_at(position, EventType::PointerMove, std::move(m_hover_route));
+    set_hovered(route);
+    route.targets.clear();
+    route.blocker.reset();
+    m_hover_route = std::move(route);
 }
 
 void InputRouter::set_hovered(const HitTestIndex::Route& route) {
@@ -385,7 +389,7 @@ void InputRouter::route_pointer(UiEvent& event, std::vector<Node*>* reached, con
     if (m_pointer_capture != nullptr && (event.type == EventType::PointerDown || event.type == EventType::PointerUp)) {
         Node* captured = m_pointer_capture;
         if (event.type == EventType::PointerDown || !captured->contains(front)) {
-            if (reached != nullptr && (event.type == EventType::PointerDown || front == captured)) reached->push_back(captured);
+            if (reached != nullptr && event.type == EventType::PointerDown) reached->push_back(captured);
             dispatch_to(*captured, event);
             return;
         }
@@ -472,7 +476,7 @@ void InputRouter::clear_inactive_targets() {
         cancel_capture();
     }
 
-    std::erase_if(m_hovered_nodes, [this](Node* node) {
+    std::erase_if(m_hovered_nodes, [](Node* node) {
         if (is_input_target(node)) return false;
 
         node->set_input_state(set_input_flag(node->input_state(), &InputState::hovered, false));

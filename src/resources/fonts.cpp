@@ -346,11 +346,6 @@ std::vector<FontSource> FontRegistry::resolve(const FontRequest& request) {
     }
 
     const auto& covered = main->coverage;
-    const auto append = [&](const FontFace* face, std::size_t added) {
-        if (added == 0) return;
-        sources.push_back(face->source);
-    };
-
     const auto* fallback = request.fallback.kind == FontSelectionKind::Family ? find(request.fallback.family_id) : nullptr;
     if (request.fallback.kind == FontSelectionKind::System && !preferences.empty()) {
         fallback = find(preferences.front());
@@ -358,7 +353,7 @@ std::vector<FontSource> FontRegistry::resolve(const FontRequest& request) {
 
     // explicit and automatic selections both contribute one complementary face
     if (fallback != nullptr) {
-        append(fallback, uncovered_characters(fallback->coverage, covered));
+        if (uncovered_characters(fallback->coverage, covered) > 0) sources.push_back(fallback->source);
         return sources;
     }
 
@@ -381,7 +376,7 @@ std::vector<FontSource> FontRegistry::resolve(const FontRequest& request) {
         consider(entry.second);
     }
 
-    if (best != nullptr) append(best, most);
+    if (best != nullptr) sources.push_back(best->source);
 
     return sources;
 }

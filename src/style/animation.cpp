@@ -24,7 +24,7 @@ StyleAnimationSequence& StyleAnimationSequence::release(StyleAnimationProperty p
 }
 
 StyleAnimationSequence& StyleAnimationSequence::release_all(TransitionSpec transition) {
-    for (StyleAnimationSlot& slot : m_state.m_animation_slots) {
+    for (StyleAnimationSlot& slot : m_state.m_animation_state->slots) {
         m_sequence.release(VisualState::target(slot), transition);
     }
     return *this;

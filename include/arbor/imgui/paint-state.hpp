@@ -54,6 +54,8 @@ namespace ui {
         std::deque<RoundedClip> m_clip_regions;
         std::vector<const RoundedClip*> m_clip_stack;
         std::vector<std::pair<ImDrawList*, const RoundedClip*>> m_clipped_lists;
+        ImDrawList* m_last_clipped_list = nullptr;
+        std::size_t m_last_clipped_index = 0;
         const RoundedClip* m_clip = nullptr;
         std::size_t m_clip_cursor = 0;
         uint64_t m_clip_id = 0;

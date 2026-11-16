@@ -122,6 +122,8 @@ void Painter::image(ImTextureID texture, Rect rect, ImVec2 uv_min, ImVec2 uv_max
 }
 
 void Painter::border(Rect rect, const ComputedStyle& style, const Color& source) const {
+    if (style.border() == BORDER_NONE || color(source).Value.w <= 0.0f) return;
+
     rect = to_screen(rect);
     const ImColor draw_color = color(source);
     if (style.uniform_border() && style.border_style() == BorderType::Solid) {

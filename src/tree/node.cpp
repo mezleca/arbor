@@ -505,6 +505,17 @@ void Node::update(float dt) {
         return;
     }
 
+    // clearing a whole subtree needs no repeated shifts of the child vector
+    if (!m_children.empty() && m_children.front()->m_removal_pending &&
+        std::ranges::all_of(m_children, [](const auto& child) { return child->m_removal_pending; })) {
+        auto removed = std::move(m_children);
+        for (const auto& child : removed)
+            child->m_parent = nullptr;
+        for (auto& child : removed)
+            child.reset();
+        return;
+    }
+
     // visit the children present after this node's update hook, removing pending children before their turn.
     size_t child_count = m_children.size();
     for (size_t index = 0; index < child_count && index < m_children.size();) {
@@ -540,9 +551,14 @@ void Node::invalidate_measure() {
     m_layout.set_box_insets(box_insets());
     m_layout.set_box_sizing(box_sizing());
     m_measure_dirty = true;
-
-    if (m_parent != nullptr && !m_parent->m_measure_dirty) {
-        m_parent->invalidate_measure();
+    ++m_measure_revision;
+    for (Node* node = m_parent; node != nullptr; node = node->m_parent) {
+        if (!node->m_measure_dirty) {
+            node->m_layout.set_box_insets(node->box_insets());
+            node->m_layout.set_box_sizing(node->box_sizing());
+        }
+        node->m_measure_dirty = true;
+        ++node->m_measure_revision;
     }
 }
 
@@ -563,6 +579,7 @@ void Node::measure_tree() {
     }
 
     on_measure();
+    ++m_measure_revision;
     m_measure_dirty = false;
 }
 

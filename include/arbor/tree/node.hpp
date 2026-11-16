@@ -213,6 +213,10 @@ namespace ui {
         void invalidate_measure();
 
     protected:
+        uint64_t measure_revision() const {
+            return m_measure_revision;
+        }
+
         virtual void surface_changed() {}
         Surface& surface() const;
         EffectRegistry* effect_registry() const;
@@ -344,6 +348,7 @@ namespace ui {
         bool m_input_enabled = true;
         bool m_enabled = true;
         bool m_measure_dirty = true;
+        uint64_t m_measure_revision = 0;
         NodeLayout m_layout;
         Surface* m_surface = nullptr;
         mutable std::unique_ptr<PaintState> m_detached_paint_state;

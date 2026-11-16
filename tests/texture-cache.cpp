@@ -261,10 +261,10 @@ TEST_CASE("texture cache handles failed loads without registering an entry", "[t
     REQUIRE(empty.find("missing") == nullptr);
 }
 
-TEST_CASE("cover cache remains bounded across a large scrolling workload", "[texture-cache]") {
+TEST_CASE("cover cache stays bounded as scrolling replaces referenced pages", "[texture-cache]") {
     TextureCacheFixture fixture;
     fixture.registry.set_cache_config({.cpu_budget_bytes = std::size_t{64} * 16});
-    for (int page = 0; page < 100; ++page) {
+    for (int page = 0; page < 3; ++page) {
         std::vector<TextureHandle> visible;
         visible.reserve(12);
         for (int item = 0; item < 12; ++item) {

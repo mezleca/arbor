@@ -63,8 +63,9 @@ void HitTestIndex::erase_subtree(Node& subtree) {
     std::erase_if(m_entries, [&subtree](const Entry& entry) { return subtree.contains(entry.node); });
 }
 
-HitTestIndex::Route HitTestIndex::route_at(ImVec2 position, EventType type) const {
-    Route route;
+HitTestIndex::Route HitTestIndex::route_at(ImVec2 position, EventType type, Route route) const {
+    route.targets.clear();
+    route.blocker.reset();
     const EventMask mask = event_mask(type);
     Node* scope = nullptr;
 

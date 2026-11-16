@@ -213,26 +213,20 @@ void StyledNode::draw() {
         return;
     }
 
-    struct DrawListSnapshot {
-        ImDrawList* draw_list = nullptr;
-        int vertex_count = 0;
-        ImGuiWindow* window = nullptr;
-    };
-
     ImGuiContext& context = *ImGui::GetCurrentContext();
     const int initial_window_count = context.Windows.Size;
     ImDrawList* background_draw_list = ImGui::GetBackgroundDrawList();
     ImDrawList* foreground_draw_list = ImGui::GetForegroundDrawList();
-    std::vector<DrawListSnapshot> draw_list_snapshots;
-    draw_list_snapshots.reserve(context.Windows.Size + 2);
+    const int background_vertices = background_draw_list->VtxBuffer.Size;
+    const int foreground_vertices = foreground_draw_list->VtxBuffer.Size;
+    m_transform_windows.clear();
+    m_transform_windows.reserve(context.Windows.Size);
 
     // active windows already contain this frame's vertices. opening an inactive child resets its buffer, so start at zero.
     for (ImGuiWindow* window : context.Windows) {
         const int first_vertex = window->LastFrameActive == context.FrameCount ? window->DrawList->VtxBuffer.Size : 0;
-        draw_list_snapshots.push_back({window->DrawList, first_vertex, window});
+        m_transform_windows.emplace_back(window, first_vertex);
     }
-    draw_list_snapshots.push_back({background_draw_list, background_draw_list->VtxBuffer.Size});
-    draw_list_snapshots.push_back({foreground_draw_list, foreground_draw_list->VtxBuffer.Size});
 
     Node::draw();
     if (is_disabled) update_cursor();
@@ -255,10 +249,12 @@ void StyledNode::draw() {
         }
     };
 
-    for (const DrawListSnapshot& snapshot : draw_list_snapshots) {
-        if (snapshot.window != nullptr && snapshot.window->LastFrameActive != context.FrameCount) continue;
-        transform_draw_list(*snapshot.draw_list, snapshot.vertex_count);
+    for (const auto& [window, vertex_count] : m_transform_windows) {
+        if (window->LastFrameActive != context.FrameCount) continue;
+        transform_draw_list(*window->DrawList, vertex_count);
     }
+    transform_draw_list(*background_draw_list, background_vertices);
+    transform_draw_list(*foreground_draw_list, foreground_vertices);
 
     for (int index = initial_window_count; index < context.Windows.Size; ++index) {
         transform_draw_list(*context.Windows[index]->DrawList, 0);

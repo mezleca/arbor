@@ -110,7 +110,10 @@ namespace ui {
         const Entry* find(uint32_t id) const;
 
         std::vector<Entry> m_entries;
-        mutable std::pmr::monotonic_buffer_resource m_command_memory;
+        mutable std::pmr::unsynchronized_pool_resource m_command_pool{
+            {.max_blocks_per_chunk = 1, .largest_required_pool_block = 1024 * 1024}
+        };
+        mutable std::pmr::monotonic_buffer_resource m_command_memory{&m_command_pool};
         std::array<EffectPass, 4> m_slots;
         uint32_t m_next_id = 1;
         bool m_initialized = false;

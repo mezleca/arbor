@@ -4,6 +4,7 @@
 #include "style.hpp"
 
 #include <array>
+#include <memory>
 #include <optional>
 
 namespace ui {
@@ -32,6 +33,12 @@ namespace ui {
         bool* layout_dirty = nullptr;
     };
 
+    struct StyleAnimationState {
+        Style presentation;
+        std::array<StyleAnimationSlot, static_cast<size_t>(StyleAnimationProperty::Count)> slots;
+        bool layout_dirty = false;
+    };
+
     class VisualState {
     public:
         VisualState();
@@ -46,7 +53,7 @@ namespace ui {
         }
 
         const ComputedStyle& computed_style() const {
-            return has_animation_overrides() ? m_presentation_style : active_style();
+            return has_animation_overrides() ? m_animation_state->presentation : active_style();
         }
 
         template <typename Func>
@@ -104,12 +111,12 @@ namespace ui {
         friend class StyleAnimationSequence;
 
         const Style& active_style() const {
-            return m_transition_style.has_value() ? *m_transition_style : style(m_target_style);
+            return m_style_transitioning ? *m_transition_style : style(m_target_style);
         }
 
         void update_animations(float dt);
         StyleAnimationSlot& slot(StyleAnimationProperty property) {
-            return m_animation_slots[static_cast<size_t>(property)];
+            return m_animation_state->slots[static_cast<size_t>(property)];
         }
 
         static AnimationTarget target(StyleAnimationSlot& slot);
@@ -117,16 +124,15 @@ namespace ui {
 
         FloatValue current_opacity;
         Style styles[static_cast<size_t>(StyleType::COUNT)];
-        std::optional<Style> m_transition_style;
-        Style m_presentation_style;
-        std::array<StyleAnimationSlot, static_cast<size_t>(StyleAnimationProperty::Count)> m_animation_slots;
+        std::unique_ptr<Style> m_transition_style;
+        std::unique_ptr<StyleAnimationState> m_animation_state;
         Animator m_style_animator;
         Animator m_animator;
         float m_opacity = 1.0f;
         TransitionSpec m_opacity_transition = OPACITY_TRANSITION;
         bool visible = true;
         bool first_frame = true;
-        bool m_layout_dirty = false;
+        bool m_style_transitioning = false;
         StyleType m_target_style = StyleType::DEFAULT;
         void* m_change_owner = nullptr;
         Style::ChangeCallback m_change_callback = nullptr;

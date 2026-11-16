@@ -35,6 +35,10 @@ public:
         m_context_frames.erase(context);
     }
 
+    void collect_context(ImGuiContext* context) override {
+        m_texture->collect_context(context);
+    }
+
     TextureMemoryUsage memory_usage(ImGuiContext* context) const override {
         return m_texture->memory_usage(context);
     }
@@ -63,6 +67,7 @@ TextureHandle TextureRegistry::load_asset(std::string id, Source&& source, Textu
         std::cerr << "arbor: cannot load texture '" << id << "' without a TextureLoader\n";
         return {};
     }
+
     try {
         auto texture = m_loader->load(std::forward<Source>(source), id);
         return store(std::move(id), std::move(texture), retention);
@@ -126,6 +131,7 @@ TextureHandle TextureRegistry::store(std::string id, std::unique_ptr<Texture> te
     if (!texture) {
         return {};
     }
+
     auto managed = std::make_shared<RegistryTexture>(std::move(texture), retention, m_access_counter);
     const auto [entry, inserted] = m_assets.try_emplace(std::move(id), std::move(managed));
     return entry->second;
@@ -173,21 +179,34 @@ void TextureRegistry::collect(ImGuiContext* context) {
         throw std::invalid_argument("texture collection requires the current imgui/graphics context");
     }
 
-    auto usage = stats(context);
+    TextureMemoryUsage usage;
+    for (const auto& [id, texture] : m_assets) {
+        if (texture->m_retention != TextureRetention::Resident) texture->collect_context(context);
+        const auto memory = texture->memory_usage(context);
+        usage.cpu_bytes += memory.cpu_bytes;
+        usage.gpu_bytes += memory.gpu_bytes;
+    }
     const int current_frame = context != nullptr ? ImGui::GetFrameCount() : -1;
     const bool pressure = usage.cpu_bytes > m_config.cpu_budget_bytes || usage.gpu_bytes > m_config.gpu_budget_bytes;
-    std::vector<decltype(m_assets)::iterator> candidates;
+
+    auto& candidates = m_collection_candidates;
+    candidates.clear();
+
     for (auto entry = m_assets.begin(); entry != m_assets.end(); ++entry) {
         const auto& texture = *entry->second;
+        if (texture.m_retention == TextureRetention::Resident) continue;
+
+        const bool unreferenced = entry->second.use_count() == 1;
+        if (!pressure && (texture.m_retention != TextureRetention::Transient || !unreferenced)) continue;
+
         const auto frame = texture.m_context_frames.find(context);
-        if (entry->second.use_count() > 1 && (frame == texture.m_context_frames.end() || frame->second == current_frame)) {
+        if (!unreferenced && (frame == texture.m_context_frames.end() || frame->second == current_frame)) {
             continue;
         }
-        if (texture.m_retention != TextureRetention::Resident &&
-            (pressure || (texture.m_retention == TextureRetention::Transient && entry->second.use_count() == 1))) {
-            candidates.push_back(entry);
-        }
+
+        candidates.push_back(entry);
     }
+
     std::ranges::sort(candidates, [](const auto& left, const auto& right) {
         return left->second->m_last_used < right->second->m_last_used;
     });
@@ -197,6 +216,7 @@ void TextureRegistry::collect(ImGuiContext* context) {
         const bool unreferenced = entry->second.use_count() == 1;
         const bool discard =
             unreferenced && (texture.m_retention == TextureRetention::Transient || usage.cpu_bytes > m_config.cpu_budget_bytes);
+
         const auto frame = texture.m_context_frames.find(context);
         if (context != nullptr && frame != texture.m_context_frames.end() && frame->second != current_frame &&
             (discard || usage.gpu_bytes > m_config.gpu_budget_bytes)) {
@@ -205,7 +225,7 @@ void TextureRegistry::collect(ImGuiContext* context) {
             usage.gpu_bytes -= before.gpu_bytes;
         }
 
-        // other contexts must release their gpu objects before the owning cpu resource can be destroyed.
+        // other contexts must release their gpu objects before the owning cpu resource can be destroyed
         if (discard && texture.m_context_frames.empty()) {
             usage.cpu_bytes -= texture.memory_usage(nullptr).cpu_bytes;
             m_assets.erase(entry);

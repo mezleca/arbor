@@ -74,12 +74,9 @@ ImFont* Font::get(std::optional<FontWeight> weight, std::optional<FontSlant> sla
     auto& files = m_files[context];
     ImFont* font = nullptr;
     for (const auto& source : variant.sources) {
-        std::error_code error;
-        // skip missing files before imgui hits its load failure assertion
-        if (!std::filesystem::is_regular_file(source.location, error)) continue;
-
         auto config = m_config;
         config.FontNo = source.index;
+
         // later sources only contribute glyphs to the first loaded face
         if (font != nullptr) {
             config.MergeMode = true;
@@ -92,6 +89,10 @@ ImFont* Font::get(std::optional<FontWeight> weight, std::optional<FontSlant> sla
             config.FontDataOwnedByAtlas = false;
             loaded = atlas->AddFontFromMemoryTTF(file->second.data, file->second.size, 0.0f, &config);
         } else {
+            // imgui asserts when a font file is missing
+            std::error_code error;
+            if (!std::filesystem::is_regular_file(source.location, error)) continue;
+
             config.FontDataOwnedByAtlas = true;
             // imgui expects utf-8 paths, which keeps non-ascii names intact on windows
             const auto path = source.location.u8string();
@@ -101,6 +102,7 @@ ImFont* Font::get(std::optional<FontWeight> weight, std::optional<FontSlant> sla
                 files.emplace(source.location, FontFileData{input.FontData, input.FontDataSize});
             }
         }
+
         if (font == nullptr) font = loaded;
     }
 
@@ -145,6 +147,7 @@ void Font::unload() {
 
 void Font::replace(Font next) {
     if (m_config.MergeMode) throw std::logic_error("cannot replace a merged font registration");
+
     // load replacements before deleting old fonts so measurement caches cannot see recycled pointers
     for (const auto& [style, variant] : m_variants) {
         for (const auto& [context, font] : variant.contexts) {
@@ -152,6 +155,7 @@ void Font::replace(Font next) {
             next.get(style.first, style.second);
         }
     }
+
     unload();
     *this = std::move(next);
 }

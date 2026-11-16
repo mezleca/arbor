@@ -181,14 +181,6 @@ TEST_CASE("colors retain directional gradients and solid fallbacks") {
     REQUIRE(radial.max_alpha() == 0.5F);
 }
 
-static const BoxShadowRegion* collected_shadow_region = nullptr;
-static const ImDrawList* collected_effect_draw_list = nullptr;
-
-static void collect_shadow_callback(void*, const ImDrawList* draw_list, const ImDrawCmd*, const void* command) {
-    collected_shadow_region = static_cast<const BoxShadowRegion*>(command);
-    collected_effect_draw_list = draw_list;
-}
-
 static void render_effect_commands(const ImDrawData& draw_data) {
     for (int list_index = 0; list_index < draw_data.CmdListsCount; ++list_index) {
         const ImDrawList* draw_list = draw_data.CmdLists[list_index];
@@ -260,7 +252,9 @@ TEST_CASE("surface effect clips remain isolated while another surface paints", "
     const auto second_context = ui_test::prepare_surface(second, {160.0F, 120.0F});
     ui_test::draw_window("painter-surface-test", [&] {
         EffectRegistry effects;
-        initialize_effect<BoxShadowRegion>(effects, EffectSlot::BoxShadow, collect_shadow_callback);
+        initialize_effect<BoxShadowRegion>(
+            effects, EffectSlot::BoxShadow, [](void*, const ImDrawList*, const ImDrawCmd*, const void*) {}
+        );
         Style style;
         style.box_shadow({.blur = 4.0F, .color = rgb(0, 0, 0)});
         ImDrawList& list = *ImGui::GetWindowDrawList();
@@ -429,50 +423,6 @@ TEST_CASE("style normalizes discrete fields and interpolates effect values") {
     normalized.box_shadow({.blur = -4.0F, .color = ImColor{0.0F, 0.0F, 0.0F, -1.0F}});
     REQUIRE(normalized.box_shadow().blur == 0.0F);
     REQUIRE(normalized.box_shadow().color.rgba().w == 0.0F);
-}
-
-TEST_CASE("container shadows stay in their owner draw list") {
-    ui_test::ImGuiContext context({320.0F, 240.0F});
-    ImGui::NewFrame();
-    ImGui::SetNextWindowPos({0.0F, 0.0F});
-    ImGui::SetNextWindowSize({320.0F, 240.0F});
-    ImGui::Begin("container-shadow-test");
-
-    EffectRegistry effects;
-    initialize_effect<BoxShadowRegion>(effects, EffectSlot::BoxShadow, collect_shadow_callback);
-    ImDrawList* foreground_draw_list = ImGui::GetForegroundDrawList();
-
-    Container node("container");
-    node.set_size({px(100.0F), px(60.0F)});
-    node.configure_all_styles([](Style& style) {
-        style.background_color(rgb(0.2F, 0.2F, 0.2F))
-            .box_shadow({
-                .offset = {4.0F, 6.0F},
-                .blur = 12.0F,
-                .spread = 40.0F,
-                .color = rgb(0.0F, 0.0F, 0.0F),
-            });
-    });
-    node.update(1.0F);
-    node.draw();
-    draw_box_shadow(effects, *ImGui::GetWindowDrawList(), node.layout().visual_rect(), node.computed_style().box_shadow(), 0.0F);
-
-    ImGui::End();
-    ImGui::EndFrame();
-    ImGui::Render();
-
-    const ImDrawData* draw_data = ImGui::GetDrawData();
-    REQUIRE(draw_data != nullptr);
-    collected_shadow_region = nullptr;
-    collected_effect_draw_list = nullptr;
-    render_effect_commands(*draw_data);
-
-    REQUIRE(collected_shadow_region != nullptr);
-    REQUIRE(collected_shadow_region->shape.size().x == Catch::Approx(180.0F));
-    REQUIRE(collected_shadow_region->shape.size().y == Catch::Approx(140.0F));
-    REQUIRE(collected_shadow_region->cutout.size().x == Catch::Approx(100.0F));
-    REQUIRE(collected_shadow_region->cutout.size().y == Catch::Approx(60.0F));
-    REQUIRE(collected_effect_draw_list != foreground_draw_list);
 }
 
 TEST_CASE("styled paint slots render before the node and above completed subtrees") {

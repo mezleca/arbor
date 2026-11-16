@@ -13,6 +13,7 @@ void PaintState::begin_frame() {
     assert(m_clip_stack.empty()); // NOLINT(cert-dcl03-c,misc-static-assert): the clip stack changes at runtime.
     m_clip_cursor = 0;
     m_clipped_lists.clear();
+    m_last_clipped_list = nullptr;
 }
 
 void PaintState::push_clip(Rect rect, float rounding, bool intersect) {
@@ -42,12 +43,16 @@ void PaintState::pop_clip() {
 void PaintState::apply_clip(ImDrawList& draw_list, EffectRegistry* effects) {
     if (m_clip_cursor == 0 || effects == nullptr) return;
 
-    auto found = std::ranges::find(m_clipped_lists, &draw_list, &std::pair<ImDrawList*, const RoundedClip*>::first);
+    auto found = m_last_clipped_list == &draw_list
+                     ? m_clipped_lists.begin() + static_cast<std::ptrdiff_t>(m_last_clipped_index)
+                     : std::ranges::find(m_clipped_lists, &draw_list, &std::pair<ImDrawList*, const RoundedClip*>::first);
     if (found == m_clipped_lists.end()) {
         if (m_clip == nullptr) return;
         m_clipped_lists.emplace_back(&draw_list, nullptr);
         found = std::prev(m_clipped_lists.end());
     }
+    m_last_clipped_list = &draw_list;
+    m_last_clipped_index = static_cast<std::size_t>(found - m_clipped_lists.begin());
     if (found->second == m_clip) return;
 
     effects->effect(EffectSlot::Clip).submit(draw_list, ClipCommand{m_clip});

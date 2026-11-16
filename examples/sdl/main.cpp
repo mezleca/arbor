@@ -36,7 +36,7 @@ int main() {
     }
 
     SDL_GL_MakeCurrent(window, context);
-    SDL_GL_SetSwapInterval(1);
+    // SDL_GL_SetSwapInterval(1);
 
     // destroy the surface before destroying the application-owned graphics context.
     {

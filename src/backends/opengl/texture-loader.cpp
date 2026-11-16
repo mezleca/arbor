@@ -112,6 +112,11 @@ static const nsgif_bitmap_cb_vt gif_bitmap_callbacks = {
     .get_rowspan = nullptr,
 };
 
+struct SvgContextTexture {
+    GLuint id;
+    int last_frame;
+};
+
 class OpenGLTexture final : public Texture {
 public:
     OpenGLTexture(std::unique_ptr<lunasvg::Document> document, std::size_t source_bytes)
@@ -134,7 +139,8 @@ public:
         auto& cache = m_textures[context];
         const auto existing = cache.find(size_key);
         if (existing != cache.end()) {
-            return static_cast<ImTextureID>(existing->second);
+            existing->second.last_frame = ImGui::GetFrameCount();
+            return static_cast<ImTextureID>(existing->second.id);
         }
 
         lunasvg::Bitmap bitmap = m_document->renderToBitmap(width, height);
@@ -143,17 +149,32 @@ public:
         // the upload copies these pixels. the size cache only needs the gpu texture id afterward.
         const GLuint texture = create_opengl_texture(width, height, GL_RGBA, bitmap.data());
 
-        cache.emplace(size_key, texture);
+        cache.emplace(size_key, SvgContextTexture{texture, ImGui::GetFrameCount()});
         return static_cast<ImTextureID>(texture);
     }
 
     void release_context(ImGuiContext* context) override {
         release_context_entry(m_textures, context, [](const auto& cache) {
             for (const auto& entry : cache) {
-                const GLuint id = entry.second;
+                const GLuint id = entry.second.id;
                 glDeleteTextures(1, &id);
             }
         });
+    }
+
+    void collect_context(ImGuiContext* context) override {
+        const auto found = m_textures.find(context);
+        if (found == m_textures.end()) return;
+
+        auto& cache = found->second;
+        while (cache.size() > 8) {
+            const auto oldest = std::min_element(cache.begin(), cache.end(), [](const auto& left, const auto& right) {
+                return left.second.last_frame < right.second.last_frame;
+            });
+            if (oldest->second.last_frame == ImGui::GetFrameCount()) break;
+            glDeleteTextures(1, &oldest->second.id);
+            cache.erase(oldest);
+        }
     }
 
     TextureMemoryUsage memory_usage(ImGuiContext* context) const override {
@@ -171,7 +192,7 @@ public:
     }
 
 private:
-    std::unordered_map<ImGuiContext*, std::unordered_map<uint64_t, GLuint>> m_textures;
+    std::unordered_map<ImGuiContext*, std::unordered_map<uint64_t, SvgContextTexture>> m_textures;
     std::unique_ptr<lunasvg::Document> m_document;
     std::size_t m_source_bytes;
 };

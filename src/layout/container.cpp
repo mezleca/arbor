@@ -108,6 +108,12 @@ ImVec2 Container::measure_content(ImVec2 available) const {
 ImVec2 Container::measure_size(ImVec2 allocation) const {
     if (children().empty()) return Node::measure_size(allocation);
 
+    const uint64_t revision = measure_revision();
+    if (m_measure_cache_valid && m_cached_measure_revision == revision && m_measure_allocation.x == allocation.x &&
+        m_measure_allocation.y == allocation.y) {
+        return m_measure_result;
+    }
+
     ImVec2 measured = outer_size(measure_content(content_size(allocation)));
 
     // line breaks change the cross extent, not the container's intrinsic main extent.
@@ -115,6 +121,12 @@ ImVec2 Container::measure_size(ImVec2 allocation) const {
         const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
         measured[main] = layout().measured_size()[main];
     }
+
+    m_measure_allocation = allocation;
+    m_measure_result = measured;
+    m_cached_measure_revision = revision;
+    m_measure_cache_valid = true;
+
     return measured;
 }
 
@@ -126,6 +138,9 @@ void Container::measure_item(LayoutItem& item, ImVec2 available) {
 }
 
 ImVec2 Container::measure_children(ImVec2 content_size, bool intrinsic) const {
+    // measurement queries overwrite the scratch buffers used by the last arrangement
+    m_children_cache_valid = false;
+
     const float spacing = m_spacing * dpi_scale();
     const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
     const int cross = 1 - main;
@@ -256,7 +271,17 @@ void Container::arrange_children(ImVec2 content_size) {
     const float spacing = m_spacing * dpi_scale();
     const int main = m_direction == StackDirection::Horizontal ? 0 : 1;
     const int cross = 1 - main;
-    const ImVec2 measured = measure_children(content_size, false);
+
+    const uint64_t revision = measure_revision();
+    if (!m_children_cache_valid || m_children_revision != revision || m_children_allocation.x != content_size.x ||
+        m_children_allocation.y != content_size.y) {
+        m_children_result = measure_children(content_size, false);
+        m_children_allocation = content_size;
+        m_children_revision = revision;
+        m_children_cache_valid = true;
+    }
+
+    const ImVec2 measured = m_children_result;
     if (m_layout_lines.empty()) return;
 
     // align-content: stretch divides spare cross space between lines, including a single wrapped line.
