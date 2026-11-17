@@ -12,16 +12,12 @@ using namespace ui;
 void Painter::draw_full_frame(Rect rect, const ComputedStyle& style, ImColor background, ImColor border) const {
     const float border_thickness = style.border_thickness() * m_scale;
     const float rounding = style.border_radius() * m_scale;
-    if (border_thickness <= 0.0F) {
-        m_draw_list.AddRectFilled(rect.min, rect.max, background, rounding);
-        return;
-    }
 
-    m_draw_list.AddRectFilled(
-        {rect.min.x + border_thickness, rect.min.y + border_thickness},
-        {rect.max.x - border_thickness, rect.max.y - border_thickness}, background, std::max(0.0f, rounding - border_thickness)
-    );
-    m_draw_list.AddRect(rect.min, rect.max, border, rounding, border_thickness);
+    // fill beneath the border so fractional scaling cannot expose gaps between their antialiased edges
+    m_draw_list.AddRectFilled(rect.min, rect.max, background, rounding);
+    if (border_thickness > 0.0f) {
+        m_draw_list.AddRect(rect.min, rect.max, border, rounding, border_thickness);
+    }
 }
 
 void Painter::frame_surface(Rect rect, const ComputedStyle& style, const std::optional<Color>& background_override) const {
