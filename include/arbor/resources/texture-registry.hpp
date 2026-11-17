@@ -75,6 +75,10 @@ namespace ui {
         TextureHandle
         acquire(std::string id, const std::filesystem::path& location, TextureRetention retention = TextureRetention::Cached);
         TextureHandle acquire(std::string id, std::string_view content, TextureRetention retention = TextureRetention::Cached);
+
+        // accepts a decoded texture on the ui thread without decoding its source again
+        TextureHandle
+        acquire(std::string id, std::unique_ptr<Texture> texture, TextureRetention retention = TextureRetention::Cached);
         TextureHandle find_handle(std::string_view id) const;
 
         void set_cache_config(TextureCacheConfig config);
@@ -94,7 +98,6 @@ namespace ui {
         template <typename Source>
         TextureHandle load_asset(std::string id, Source&& source, TextureRetention retention);
         static Texture* pin(const TextureHandle& texture);
-        TextureHandle store(std::string id, std::unique_ptr<Texture> texture, TextureRetention retention);
 
         std::unique_ptr<TextureLoader> m_loader;
         std::unordered_map<std::string, std::shared_ptr<RegistryTexture>, StringHash, std::equal_to<>> m_assets;

@@ -70,7 +70,7 @@ TextureHandle TextureRegistry::load_asset(std::string id, Source&& source, Textu
 
     try {
         auto texture = m_loader->load(std::forward<Source>(source), id);
-        return store(std::move(id), std::move(texture), retention);
+        return acquire(std::move(id), std::move(texture), retention);
     } catch (const std::runtime_error& error) {
         std::cerr << "arbor: cannot load texture '" << id << "': " << error.what() << '\n';
         return {};
@@ -127,7 +127,10 @@ TextureHandle TextureRegistry::find_handle(std::string_view id) const {
     return found->second;
 }
 
-TextureHandle TextureRegistry::store(std::string id, std::unique_ptr<Texture> texture, TextureRetention retention) {
+TextureHandle TextureRegistry::acquire(std::string id, std::unique_ptr<Texture> texture, TextureRetention retention) {
+    if (auto existing = find_handle(id)) {
+        return existing;
+    }
     if (!texture) {
         return {};
     }
