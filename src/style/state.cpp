@@ -156,11 +156,19 @@ void VisualState::set_item_state(bool hovered, bool active, bool focused) {
         set_style(StyleType::ACTIVE);
         return;
     }
+
+    // a clicked control keeps focus, but moving over it must still use its hover style
+    if (hovered) {
+        set_style(StyleType::HOVER);
+        return;
+    }
+
     if (focused) {
         set_style(StyleType::FOCUS);
         return;
     }
-    set_style(hovered ? StyleType::HOVER : StyleType::DEFAULT);
+
+    set_style(StyleType::DEFAULT);
 }
 
 void VisualState::set_size(LayoutSize size) {
