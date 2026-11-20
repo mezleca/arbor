@@ -19,6 +19,10 @@ namespace ui {
         std::string label;
         std::vector<ContextMenuItem> children;
         ContextMenuCallback callback;
+        bool close_on_activate = true;
+
+        // replaces the default label with custom children owned by the row
+        std::function<void(Widget&)> build_content = {};
 
         static ContextMenuItem action(std::string label, ContextMenuCallback callback = {}) {
             return {.label = std::move(label), .children = {}, .callback = std::move(callback)};

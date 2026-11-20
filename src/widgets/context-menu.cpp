@@ -13,8 +13,10 @@ using namespace ui;
 
 class ui::ContextMenuItemNode final : public Widget {
 public:
-    ContextMenuItemNode(ContextMenuWidget& menu, std::string label, ContextMenuCallback callback)
-        : Widget("item", "ContextMenuItem"), m_menu(menu), m_label(std::move(label)), m_callback(std::move(callback)) {}
+    ContextMenuItemNode(ContextMenuWidget& menu, ContextMenuItem item, bool custom_content)
+        : Widget("item", "ContextMenuItem"), m_menu(menu), m_label(std::move(item.label)),
+          m_callback(std::move(item.callback)), m_close_on_activate(item.close_on_activate),
+          m_custom_content(custom_content) {}
 
     bool accepts_input() const override {
         return m_menu.is_open() && Widget::accepts_input();
@@ -57,10 +59,19 @@ private:
 
     void paint_content(const PaintContext& context) override {
         const Rect content = context.content_rect;
-        const ImVec2 text_size = context.painter.text_size(m_label);
-        context.painter.text(
-            {content.min.x, content.min.y + ((content.size().y - text_size.y) * 0.5F)}, context.style.color().value, m_label
-        );
+        if (!m_custom_content) {
+            const ImVec2 text_size = context.painter.text_size(m_label);
+            Rect text_rect = content;
+            if (m_submenu != nullptr) {
+                text_rect.max.x = std::max(text_rect.min.x, text_rect.max.x - 22.0f);
+            }
+            context.painter.push_clip(text_rect);
+            context.painter.text(
+                {content.min.x, content.min.y + ((content.size().y - text_size.y) * 0.5f)},
+                context.style.color().value, m_label
+            );
+            context.painter.pop_clip();
+        }
 
         if (m_submenu != nullptr) {
             draw_submenu_icon(context);
@@ -94,6 +105,8 @@ private:
     std::string m_label;
     ContextMenuCallback m_callback;
     ContextMenuWidget* m_submenu = nullptr;
+    bool m_close_on_activate = true;
+    bool m_custom_content = false;
 };
 
 ContextMenuWidget::ContextMenuWidget(ContextMenuItems items, Texture* submenu_icon)
@@ -136,14 +149,19 @@ ContextMenuWidget& ContextMenuWidget::set_items(ContextMenuItems items) {
     clear();
 
     for (ContextMenuItem& item : items) {
-        auto& menu_item = add<ContextMenuItemNode>(*this, std::move(item.label), std::move(item.callback));
+        auto children = std::move(item.children);
+        auto build_content = std::move(item.build_content);
+        auto& menu_item = add<ContextMenuItemNode>(*this, std::move(item), bool(build_content));
         m_items.push_back(&menu_item);
+        if (build_content) {
+            build_content(menu_item);
+        }
 
-        if (item.children.empty()) {
+        if (children.empty()) {
             continue;
         }
 
-        auto& submenu = add<ContextMenuWidget>(std::move(item.children), m_submenu_icon);
+        auto& submenu = add<ContextMenuWidget>(std::move(children), m_submenu_icon);
         if (m_submenu_icon_handle) {
             submenu.set_submenu_icon(m_submenu_icon_handle);
         }
@@ -342,7 +360,9 @@ void ContextMenuWidget::activate_item(ContextMenuItemNode& item) {
     }
 
     ContextMenuWidget& root = root_menu();
-    root.close();
+    if (item.m_close_on_activate) {
+        root.close();
+    }
     if (item.m_callback) {
         item.m_callback(root);
     }
