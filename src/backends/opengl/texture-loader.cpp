@@ -231,6 +231,10 @@ public:
             plutovg_surface_get_data(m_surface)
         );
 
+        // mipmaps suppress aliasing when raster images are drawn below their decoded size
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glGenerateMipmap(GL_TEXTURE_2D);
+
         m_textures.emplace(context, texture);
         return static_cast<ImTextureID>(texture);
     }
@@ -243,7 +247,16 @@ public:
         const auto bytes =
             static_cast<std::size_t>(plutovg_surface_get_stride(m_surface)) * plutovg_surface_get_height(m_surface);
         const auto copies = context == nullptr ? m_textures.size() : static_cast<std::size_t>(m_textures.contains(context));
-        return {bytes, bytes * copies};
+        std::size_t gpu_bytes = 0;
+        int width = plutovg_surface_get_width(m_surface);
+        int height = plutovg_surface_get_height(m_surface);
+        for (;;) {
+            gpu_bytes += static_cast<std::size_t>(width) * height * 4U;
+            if (width == 1 && height == 1) break;
+            width = std::max(1, width / 2);
+            height = std::max(1, height / 2);
+        }
+        return {bytes, gpu_bytes * copies};
     }
 
 private:

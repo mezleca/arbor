@@ -999,6 +999,43 @@ TEST_CASE("raster textures decode from memory without a graphics context", "[tex
     REQUIRE(memory->memory_usage().gpu_bytes == 0);
 }
 
+TEST_CASE("raster uploads include filtered mipmaps in their gpu budget", "[texture][raster]") {
+    SdlVideoSession sdl({64.0f, 64.0f});
+    ui_test::ImGuiContext context({64.0f, 64.0f});
+    ui::OpenGLTextureLoader loader;
+    auto texture = loader.load(std::filesystem::path{ARBOR_ASSETS_DIR} / "images/tiny.jpg", "raster");
+    REQUIRE(texture != nullptr);
+    const auto id = texture->get({32.0f, 32.0f});
+    REQUIRE(id != 0);
+    CHECK(texture->get({16.0f, 16.0f}) == id);
+    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(id));
+    GLint filter = 0;
+    glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &filter);
+    CHECK(filter == GL_LINEAR_MIPMAP_LINEAR);
+    glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, &filter);
+    CHECK(filter == GL_LINEAR);
+
+    int width = static_cast<int>(texture->size().x);
+    int height = static_cast<int>(texture->size().y);
+    std::size_t bytes = 0;
+    for (int level = 0;; ++level) {
+        GLint actual_width = 0;
+        GLint actual_height = 0;
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_WIDTH, &actual_width);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, level, GL_TEXTURE_HEIGHT, &actual_height);
+        CHECK(actual_width == width);
+        CHECK(actual_height == height);
+        bytes += static_cast<std::size_t>(width) * height * 4U;
+        if (width == 1 && height == 1) break;
+        width = std::max(1, width / 2);
+        height = std::max(1, height / 2);
+    }
+    CHECK(texture->memory_usage().gpu_bytes == bytes);
+    texture->release_context(ImGui::GetCurrentContext());
+    CHECK(texture->memory_usage().gpu_bytes == 0);
+    CHECK(glGetError() == GL_NO_ERROR);
+}
+
 TEST_CASE("svg textures cache uploads by size and release their context", "[texture][svg]") {
     SdlVideoSession sdl({64.0F, 64.0F});
     ui_test::ImGuiContext context({64.0F, 64.0F});
