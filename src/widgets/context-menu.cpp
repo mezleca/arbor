@@ -235,7 +235,10 @@ void ContextMenuWidget::open_at(ImVec2 screen_position) {
         return;
     }
     LayoutConfig config = layout().config();
-    config.placement.offset = {screen_position.x - work_area.min.x, screen_position.y - work_area.min.y};
+
+    // placement offsets are logical, pointer and viewport coordinates are already scaled
+    const float scale = dpi_scale();
+    config.placement.offset = {(screen_position.x - work_area.min.x) / scale, (screen_position.y - work_area.min.y) / scale};
     set_layout(config);
     invalidate_measure();
     activate();
@@ -302,11 +305,12 @@ void ContextMenuWidget::on_measure() {
     if (!work_area.valid()) return;
 
     LayoutConfig config = layout().config();
+    const float scale = dpi_scale();
     const ImVec2 position = clamp_position(
         work_area, layout().intrinsic_size(),
-        {work_area.min.x + config.placement.offset.x, work_area.min.y + config.placement.offset.y}
+        {work_area.min.x + config.placement.offset.x * scale, work_area.min.y + config.placement.offset.y * scale}
     );
-    config.placement.offset = {position.x - work_area.min.x, position.y - work_area.min.y};
+    config.placement.offset = {(position.x - work_area.min.x) / scale, (position.y - work_area.min.y) / scale};
     set_layout(config);
 }
 
@@ -417,7 +421,8 @@ void ContextMenuWidget::position_submenu(ContextMenuWidget& submenu, const Conte
     const Rect work_area = viewport_work_area();
     const ImVec2 submenu_size = submenu.layout().intrinsic_size();
 
-    const float submenu_gap = 6.0F;
+    const float scale = dpi_scale();
+    const float submenu_gap = 6.0f * scale;
     float screen_x = item_rect.max.x + submenu_gap;
     if (screen_x + submenu_size.x > work_area.max.x) {
         screen_x = item_rect.min.x - submenu_size.x - submenu_gap;
@@ -428,7 +433,7 @@ void ContextMenuWidget::position_submenu(ContextMenuWidget& submenu, const Conte
     const ImVec2 content_offset = ImGui::GetCursorStartPos();
     const ImVec2 content_origin = {window_position.x + content_offset.x, window_position.y + content_offset.y};
     LayoutConfig config = submenu.layout().config();
-    config.placement.offset = {position.x - content_origin.x, position.y - content_origin.y};
+    config.placement.offset = {(position.x - content_origin.x) / scale, (position.y - content_origin.y) / scale};
     submenu.set_layout(config);
     submenu.draw();
 }
